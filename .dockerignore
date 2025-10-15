@@ -1,0 +1,9 @@
+# Don't copy these into Docker build context (speeds up image builds)
+node_modules/
+dist-electron/
+dist-react/
+native/build/
+.git/
+.vscode/
+*.log
+npm-debug.log*

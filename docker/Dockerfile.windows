@@ -1,0 +1,21 @@
+# escape=`
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+
+SHELL ["powershell", "-Command"]
+RUN Set-DnsClientServerAddress -InterfaceAlias "Ethernet" -ServerAddresses 8.8.8.8,1.1.1.1; `
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12; `
+    iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')); `
+    Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
+
+RUN Set-DnsClientServerAddress -InterfaceAlias "Ethernet" -ServerAddresses 8.8.8.8,1.1.1.1; `
+    choco install -y mingw cmake nodejs-lts
+
+# Set working directory
+WORKDIR C:/app
+
+# Copy your native C++ code
+WORKDIR C:/app/native
+
+# # Build your addon
+# RUN cmake -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release; `
+#     cmake --build build --config Release
