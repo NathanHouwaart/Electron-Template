@@ -1,0 +1,110 @@
+#include "..\Headers\SerialCommunication.h"
+#include <iostream>
+
+namespace NFC_Controller
+{
+	namespace Cpp
+	{
+		SerialCommunication::SerialCommunication() {
+
+		}
+
+        void SerialCommunication::init(std::string portname, uint32_t baudrate){
+            open_port(portname);
+            set_timeout();
+            set_baudrate(baudrate);
+        }
+
+
+		void SerialCommunication::close_port() {
+			if (is_open)
+			{
+				CloseHandle(serial_handler);
+				is_open = false;
+			}
+		}
+
+
+		void SerialCommunication::wake_up() {
+			uint8_t data[10] = {  };
+			this->send_data(data, 10);
+		}
+
+
+		bool SerialCommunication::open_port(std::string portname) {
+			auto name = "\\\\.\\" + portname;
+
+			serial_handler = CreateFileA(
+				name.c_str(),
+				GENERIC_READ | GENERIC_WRITE, 0, NULL,
+				OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+			if (serial_handler == INVALID_HANDLE_VALUE) {
+				fprintf(stderr, "error setting up comm port\n");
+				return false;
+			}
+			is_open = true;
+			return true;
+		}
+
+
+		bool SerialCommunication::send_data(uint8_t* data, const uint8_t n_bytes) {
+			DWORD iBytesWritten = 0;
+			return WriteFile(serial_handler, data, n_bytes, &iBytesWritten, NULL);
+		}
+
+		bool SerialCommunication::send_data(const uint8_t* data, const uint8_t n_bytes) {
+			DWORD iBytesWritten = 0;
+			return WriteFile(serial_handler, data, n_bytes, &iBytesWritten, NULL);
+		}
+
+
+		uint32_t SerialCommunication::receive_data(uint8_t* receive_buffer, const uint8_t n_bytes) {
+			DWORD dwBytesTransferred = 0;
+
+			ReadFile(serial_handler, receive_buffer, n_bytes, &dwBytesTransferred, 0);
+			return dwBytesTransferred;
+		}
+
+
+		bool SerialCommunication::set_timeout() {
+			// Set COM port timeout settings
+			serial_timeouts.ReadIntervalTimeout = 50;
+			serial_timeouts.ReadTotalTimeoutConstant = 50;
+			serial_timeouts.ReadTotalTimeoutMultiplier = 1;
+			serial_timeouts.WriteTotalTimeoutConstant = 50;
+			serial_timeouts.WriteTotalTimeoutMultiplier = 10;
+
+			if (SetCommTimeouts(serial_handler, &serial_timeouts) == 0)
+			{
+				fprintf(stderr, "Error setting timeouts\n");
+				CloseHandle(serial_handler);
+				return 0;
+			}
+			return 1;
+		}
+
+
+		bool SerialCommunication::set_baudrate(uint32_t baudrate) {
+			dcb_handler.DCBlength = sizeof(dcb_handler);
+			if (GetCommState(serial_handler, &dcb_handler) == 0)
+			{
+				fprintf(stderr, "Error getting device state\n");
+				CloseHandle(serial_handler);
+				return 1;
+			}
+
+			dcb_handler.BaudRate = baudrate;
+			dcb_handler.ByteSize = 8;
+			dcb_handler.StopBits = ONESTOPBIT;
+			dcb_handler.Parity = NOPARITY;
+			if (SetCommState(serial_handler, &dcb_handler) == 0)
+			{
+				fprintf(stderr, "Error setting device parameters\n");
+				CloseHandle(serial_handler);
+				return 0;
+			}
+			return 1;
+		}
+	} // namespace Cpp
+} // namespace NFC_Controller

@@ -6,7 +6,9 @@ electron.contextBridge.exposeInMainWorld("electron", {
             callback(stats)
         });
     },
-    getStaticData: () => ipcInvoke("getStaticData")
+    getStaticData: () => ipcInvoke("getStaticData"),
+    getFirmwareVersion: () => ipcInvoke("getFirmwareVersion"),
+    listComPorts: () => ipcInvoke("listComPorts"),
 } satisfies Window["electron"]);
 
 

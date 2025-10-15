@@ -38,7 +38,16 @@ export interface MyObject {
     add(a: number, b: number): number;
 }
 
+export interface PN532_Wrapper {
+    init(info: string): void;
+    getFirmwareVersion(): string;
+}
+
 export const MyObject: {
     new(name: string): MyObject;
 } = addon.MyObject;
+
+export const PN532_Wrapper: {
+    new(): PN532_Wrapper;
+} = addon.PN532_Wrapper;
 // ...existing code...

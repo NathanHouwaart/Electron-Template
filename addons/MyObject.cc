@@ -1,4 +1,9 @@
 #include "MyObject.h"
+#include "PN532_Controller/Headers/SerialCommunication.h"
+#include "PN532_Controller/Headers/pn532.h"
+#include <iostream>
+#include <memory>
+#include "Pn532Wrapper.h"
 
 using namespace Napi;
 
@@ -48,6 +53,17 @@ Napi::Value MyObject::Greet(const Napi::CallbackInfo& info)
     printf("Hello %s\n", name.Utf8Value().c_str());
     printf("My name is %s\n", _greeterName.c_str());
 
+    // char firmware_string[255];
+    // m_protocol->init("COM5", 115200);
+    // m_nfc_chip->SAMConfiguration(NFC_Controller::Cpp::pn532::command::SAMmode::Normal_mode);
+    // m_nfc_chip->setMaxRetries(0xFF);
+    // auto firmware = m_nfc_chip->getFirmwareVersion();
+    // if(firmware[0] == NFC_Controller::Cpp::statusCode::pn532StatusOK){
+    //     std::cout << "Connected to NFC-reader!" << std::endl;
+    //     sprintf(firmware_string, "Found NFC device PN5%X\nFirmware version %X.%X.%X", firmware[1], firmware[2], firmware[3], firmware[4]);
+    //     std::cout << firmware_string << std::endl;
+    // }
+
     return Napi::Value();
 }
 
@@ -87,12 +103,3 @@ Napi::Function MyObject::GetClass(Napi::Env env)
         }
     );
 }
-
-Napi::Object Init(Napi::Env env, Napi::Object exports)
-{
-    Napi::String name = Napi::String::New(env, "MyObject");
-    exports.Set(name, MyObject::GetClass(env));
-    return exports;
-}
-
-NODE_API_MODULE(addon, Init)
