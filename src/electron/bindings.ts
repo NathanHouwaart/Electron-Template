@@ -1,36 +1,44 @@
+// ...existing code...
 import { createRequire } from 'module';
+import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 
 const require = createRequire(import.meta.url);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-const addonPath = 'C:\\Users\\Nathan-HvA\\Documents\\Electron-Template\\build\\deviceaddon.node';
+// common places cmake-js / node-gyp put the .node file
+const candidates = [
+  path.resolve(process.cwd(), 'build', 'Release', 'deviceaddon.node'),
+  path.resolve(process.cwd(), 'build', 'deviceaddon.node'),
+  path.resolve(__dirname, '..', '..', 'build', 'Release', 'deviceaddon.node'),
+  path.resolve(__dirname, '..', '..', 'build', 'deviceaddon.node')
+];
 
-console.log('[bindings] Checking addon path:', addonPath);
-console.log('[bindings] Addon exists:', fs.existsSync(addonPath));
+console.log('bindings: process.cwd() =', process.cwd());
+console.log('bindings: __filename =', __filename);
+console.log('bindings: __dirname =', __dirname);
+console.log('bindings: candidates =', candidates);
 
-if (!fs.existsSync(addonPath)) {
-  throw new Error(`Native addon not found at: ${addonPath}`);
+const addonPath = candidates.find(p => fs.existsSync(p));
+console.log('bindings: addonPath found =', addonPath);
+
+if (!addonPath) {
+  throw new Error(
+    'deviceaddon.node not found. Run `npm run build:addon:rebuild` and confirm output location. Checked: ' +
+    candidates.join(';')
+  );
 }
 
-console.log('[bindings] Attempting to require addon...');
-let addon: any;
-try {
-  addon = require(addonPath);
-  console.log('[bindings] Addon loaded successfully, keys:', Object.keys(addon));
-} catch (error) {
-  console.error('[bindings] Failed to load addon:', error);
-  throw error;
+const addon: any = require(addonPath);
+
+export interface MyObject {
+    greet(str: string): string;
+    add(a: number, b: number): number;
 }
 
-export const MyObject = {
-  Connect(port: string) { 
-    console.log('[MyObject] Connecting to port:', port);
-    return addon.connect(port);
-  },
-  ReadData() { 
-    console.log('[MyObject] Reading data from device');
-    return addon.readData();
-   }
-};
-
-export default MyObject;
+export const MyObject: {
+    new(name: string): MyObject;
+} = addon.MyObject;
+// ...existing code...
