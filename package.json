@@ -26,11 +26,15 @@
     ]
   },
   "dependencies": {
+    "@tailwindcss/vite": "^4.1.14",
     "cmake-js": "^7.3.1",
+    "lucide-react": "^0.545.0",
     "node-addon-api": "^8.5.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "serialport": "^13.0.0"
+    "react-router-dom": "^7.9.4",
+    "serialport": "^13.0.0",
+    "tailwindcss": "^4.1.14"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",

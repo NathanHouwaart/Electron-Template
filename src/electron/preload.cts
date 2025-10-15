@@ -7,6 +7,8 @@ electron.contextBridge.exposeInMainWorld("electron", {
         });
     },
     getStaticData: () => ipcInvoke("getStaticData"),
+    connect: (port: string) => ipcInvoke("connect", port),
+    disconnect: () => ipcInvoke("disconnect"),
     getFirmwareVersion: () => ipcInvoke("getFirmwareVersion"),
     listComPorts: () => ipcInvoke("listComPorts"),
 } satisfies Window["electron"]);
@@ -14,8 +16,9 @@ electron.contextBridge.exposeInMainWorld("electron", {
 
 function ipcInvoke<Key extends keyof EventPayloadMapping>(
     key: Key,
+    ...args: EventInvokeArgs[Key]
 ): Promise<EventPayloadMapping[Key]> {
-    return electron.ipcRenderer.invoke(key);
+    return electron.ipcRenderer.invoke(key, ...args);
 }
 
 function ipcOn<Key extends keyof EventPayloadMapping>(

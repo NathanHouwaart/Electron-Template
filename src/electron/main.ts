@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, IpcMainInvokeEvent } from 'electron'
 import path from 'path'
 import { isDev } from './utils.js';
 import { MyObject, PN532_Wrapper } from './bindings.js';
@@ -42,10 +42,24 @@ app.on('ready', () => {
   console.log(obj.add(5, 3));
 });
 
-ipcMain.handle('getFirmwareVersion', async () => {
+ipcMain.handle('connect', async (event: IpcMainInvokeEvent, port: string) => {
+  console.log('ipcMain: connect called with args:', port);
+
   const obj = new PN532_Wrapper();
-  obj.init('test');
-  return await obj.getFirmwareVersion();
+  return obj.connect(port);
+});
+
+ipcMain.handle('disconnect', async () => {
+  console.log('ipcMain: disconnect called');
+
+  const obj = new PN532_Wrapper();
+  return obj.disconnect();
+});
+
+ipcMain.handle('getFirmwareVersion', () => {
+  console.log('ipcMain: getFirmwareVersion called');
+  const obj = new PN532_Wrapper();
+  return obj.getFirmwareVersion();
 });
 
 ipcMain.handle('listComPorts', async () => {

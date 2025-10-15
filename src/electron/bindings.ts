@@ -40,6 +40,8 @@ export interface MyObject {
 
 export interface PN532_Wrapper {
     init(info: string): void;
+    connect(port: string): Promise<boolean>;
+    disconnect(): Promise<boolean>;
     getFirmwareVersion(): string;
 }
 

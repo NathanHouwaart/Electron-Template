@@ -31,13 +31,13 @@ namespace NFC_Controller
              */
             SerialCommunication();
 
-            void init(std::string portname, uint32_t baudrate);
+            bool init(std::string portname, uint32_t baudrate);
 
             /**
              * @brief Closes serial connection
              *
              */
-            void close_port();
+            bool close_port();
 
             /**
              * @brief Opens Serial Connection

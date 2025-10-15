@@ -1,54 +1,30 @@
 import { useEffect, useState } from 'react'
 import reactLogo from './assets/react.svg'
 import './App.css'
+import ModernSidebar from './Components/MainPage';
+import { Link, Route, Routes } from 'react-router-dom';
 
 function App() {
-  const [count, setCount] = useState(0)
-  const [comPorts, setComPorts] = useState<{ path: string; manufacturer?: string }[]>([]);
-
-  useEffect(() => {
-    const fetchPorts = async () => {
-      const ports = await window.electron.listComPorts();
-      setComPorts(ports);
-    };
-    
-    fetchPorts();
-  }, []);
-
   return (
     <>
-      <div>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        
-        <select>
-          {comPorts.map((port, index) => (
-            <option key={index} value={port.path}>
-              {port.path} {port.manufacturer && `(${port.manufacturer})`}
-            </option>
-          ))}
-        </select>
+      {/* <header className="p-4 border-b">
+        <nav className="flex gap-4">
+          <Link to="/">Home</Link>
+          <Link to="/about">About</Link>
+          <Link to="/settings">Settings</Link>
+        </nav>
+      </header> */}
 
-        <button onClick={async () => {
-          const version = await window.electron.getFirmwareVersion();
-          console.log('Firmware Version:', version);
-        }}>
-          Get Firmware Version
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
+      <div className="flex">
+        <main className="p-4 flex-1">
+          <Routes>
+            <Route path="/" element={<ModernSidebar />} />
+            {/* <Route path="/about" element={<About />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="*" element={<NotFound />} /> */}
+          </Routes>
+        </main>
       </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
     </>
   )
 }

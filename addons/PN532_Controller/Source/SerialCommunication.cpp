@@ -9,19 +9,37 @@ namespace NFC_Controller
 
 		}
 
-        void SerialCommunication::init(std::string portname, uint32_t baudrate){
-            open_port(portname);
-            set_timeout();
-            set_baudrate(baudrate);
+        bool SerialCommunication::init(std::string portname, uint32_t baudrate){
+            // Open the given port
+			if (!open_port(portname)) {
+				return false;
+			}
+
+			// Set COM port timeout settings
+            if (!set_timeout()) {
+				return false;
+			}
+
+			// Set COM port baudrate
+            if (!set_baudrate(baudrate)) {
+				return false;
+			}
+			
+			// Confirm that the port is open
+			return true;
         }
 
 
-		void SerialCommunication::close_port() {
+		bool SerialCommunication::close_port() {
 			if (is_open)
 			{
-				CloseHandle(serial_handler);
-				is_open = false;
+				auto res = CloseHandle(serial_handler);
+				if (res) {
+					is_open = false;
+				}
+				return res;
 			}
+			return false;
 		}
 
 
