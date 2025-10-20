@@ -76,6 +76,8 @@ using Pn532TargetInfo = std::variant<Iso14443ATarget,
                                      FelicaTarget,
                                      JewelTarget>;
 
+#include <iostream>
+
 struct Pn532Target
 {
     enum class Type { TypeA, TypeB, FeliCa, Jewel, Unknown } type;
@@ -86,4 +88,28 @@ struct Pn532Target
     bool isTypeB() const { return type == Type::TypeB; }
     bool isFeliCa() const { return type == Type::FeliCa; }
     bool isJewel() const { return type == Type::Jewel; }
+
+    void print() const
+    {
+        std::visit([](const auto& t) {
+            using T = std::decay_t<decltype(t)>;
+            if constexpr (std::is_same_v<T, Iso14443ATarget>) {
+                std::cout << "TypeA UID: ";
+                for (auto b : t.uid) std::cout << std::hex << +b << " ";
+                std::cout << "\n";
+            } else if constexpr (std::is_same_v<T, Iso14443BTarget>) {
+                std::cout << "TypeB PUPI: ";
+                for (auto b : t.pupi) std::cout << std::hex << +b << " ";
+                std::cout << "\n";
+            } else if constexpr (std::is_same_v<T, FelicaTarget>) {
+                std::cout << "FeliCa IDm: ";
+                for (auto b : t.idm) std::cout << std::hex << +b << " ";
+                std::cout << "\n";
+            } else if constexpr (std::is_same_v<T, JewelTarget>) {
+                std::cout << "Jewel ID: ";
+                for (auto b : t.id) std::cout << std::hex << +b << " ";
+                std::cout << "\n";
+            }
+        }, info);
+    }
 };
