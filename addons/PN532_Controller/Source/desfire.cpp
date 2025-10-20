@@ -3,6 +3,7 @@
 #include <iostream>
 #include <iomanip>
 #include "../Headers/hex.h"
+#include "../../AddonLog.h"
 
 using namespace NFC_Controller::Cpp;
 
@@ -50,7 +51,7 @@ namespace Desfire
         return os;
     }
 
-    bool desfireParseGetVersionFrame(DesfireVersion &versionStruct, const uint8_t *data, uint8_t frameIndex)
+    bool desfireParseGetVersionFrame(DesfireVersion &versionStruct, const uint8_t *data, uint8_t responseSize, uint8_t frameIndex)
     {
         // Check for null pointer
         if (!data)
@@ -59,8 +60,16 @@ namespace Desfire
             return false;
         }
 
+        Log("Parsing DESFire GetVersion frame " + std::to_string(frameIndex) + " with size " + std::to_string(responseSize) + "\n");
+        for (uint8_t i = 0; i < responseSize; i++)
+        {
+            std::cout << "0x" << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(data[i]) << " ";
+        }
+        std::cout << std::endl;
+
+
         // Extract frame length
-        uint8_t frameLength = data[0];
+        uint8_t frameLength = responseSize;
 
         switch (frameIndex)
         {
@@ -70,23 +79,25 @@ namespace Desfire
                 std::cout << "Not enough data for hardware info." << std::endl;
                 return false; // Not enough data for hardware info
             }
-            memcpy(&versionStruct.hardwareInfo, &data[5], sizeof(versionStruct.hardwareInfo));
+            memcpy(&versionStruct.hardwareInfo, data, sizeof(versionStruct.hardwareInfo));
             break;
 
         case 1: // Software info
             if (frameLength < sizeof(versionStruct.softwareInfo))
             {
+                std::cout << "Not enough data for software info." << std::endl;
                 return false; // Not enough data for software info
             }
-            memcpy(&versionStruct.softwareInfo, &data[5], sizeof(versionStruct.softwareInfo));
+            memcpy(&versionStruct.softwareInfo, data, sizeof(versionStruct.softwareInfo));
             break;
 
         case 2: // Manufacturing info
             if (frameLength < sizeof(versionStruct.manufacturingInfo))
             {
+                std::cout << "Not enough data for manufacturing info." << std::endl;
                 return false; // Not enough data for manufacturing info
             }
-            memcpy(&versionStruct.manufacturingInfo, &data[5], sizeof(versionStruct.manufacturingInfo));
+            memcpy(&versionStruct.manufacturingInfo, data, sizeof(versionStruct.manufacturingInfo));
             break;
 
         default:
@@ -131,6 +142,7 @@ namespace Desfire
             auto result = _nfc.initDataExchange(command, sizeof(command), responseBuffer, responseSize);
             if (result != statusCode::pn532StatusOK)
             {
+                std::cout << "Failed to initialize data exchange." << std::endl;
                 return result;
             }
             
@@ -142,7 +154,7 @@ namespace Desfire
             std::cout << std::endl;
 
             // Parse response frame
-            if (!desfireParseGetVersionFrame(versionStruct, responseBuffer, frameIndex))
+            if (!desfireParseGetVersionFrame(versionStruct, responseBuffer, responseSize, frameIndex))
             {
                 std::cout << "Failed to parse response frame " << int(frameIndex) << std::endl;
                 return statusCode::pn532StatusWrongCommand;
@@ -154,7 +166,7 @@ namespace Desfire
             }
             frameIndex++;
 
-        } while (responseSize > 0 && responseBuffer[responseSize - 4] == 0x91 && responseBuffer[responseSize - 3] == 0xAF);
+        } while (responseSize > 0 && responseBuffer[responseSize - 2] == 0x91 && responseBuffer[responseSize - 1] == 0xAF);
 
         std::cout << versionStruct << std::endl;
 

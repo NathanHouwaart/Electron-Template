@@ -61,6 +61,9 @@ namespace Desfire
     static constexpr auto x = sizeof(DesfireVersion);
     static_assert(sizeof(DesfireVersion) == 28, "unexpected packing for DesfireVersion");
 
+#include <iostream>
+#include <iomanip>
+
     std::ostream &operator<<(std::ostream &os, const DesfireVersion &v);
 
     bool desfireParseGetVersionFrame(DesfireVersion &versionStruct, const uint8_t *data, uint8_t frameIndex);

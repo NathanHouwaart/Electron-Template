@@ -29,7 +29,7 @@ namespace NFC_Controller
     namespace Cpp
     {
         /// Struct where results of functions can be stored in
-        struct Result { statusCode status; receivedCommand response; };
+        struct Result { statusCode status; pn532Response response; };
 
         /// \brief
         /// Pure abstract template class that can be implemented by any nfc reader

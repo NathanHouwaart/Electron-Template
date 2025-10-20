@@ -54,7 +54,7 @@ Napi::Value PN532_Wrapper::Connect(const Napi::CallbackInfo& info)
         return Napi::Boolean::New(env, false);
     }
 
-    result = m_nfc_chip->setMaxRetries(0xFF);
+    result = m_nfc_chip->setMaxRetries(0x01); // Set max retries to 1
     if(result != NFC_Controller::Cpp::statusCode::pn532StatusOK){
         Napi::Error::New(env, "Failed to set max retries")
             .ThrowAsJavaScriptException();

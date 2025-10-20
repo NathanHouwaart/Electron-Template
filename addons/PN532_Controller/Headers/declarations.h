@@ -73,7 +73,9 @@ namespace NFC_Controller
             pn532StatusReleased                 = 0x27,
             pn532StatusOverCurrent              = 0x2D,
             pn532StatusMissingDEP               = 0x2E,
-            pn532statusSAMerror                 = 0x2F
+            pn532statusSAMerror                 = 0x2F,
+            pn532StatusFrameCheckFailed         = 0x30,
+            pn532StatusInvalidResponse          = 0x31
         };
 
         enum frameDirection : const uint8_t{
@@ -136,8 +138,8 @@ namespace NFC_Controller
                 const uint8_t bufferSize            = 64;
                 static constexpr uint8_t Ack_buffer_template_i2c[7] = { 0x01, 0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00};  // When using i2c, the received ack frame will be one byte longer
                 static constexpr uint8_t Ack_buffer_template_spi[6] = { 0x00, 0x00, 0xFF,0x00, 0xFF, 0x00};
-                const uint8_t Preamble1             = 0x00;
-                const uint8_t Preamble2             = 0xFF;
+                const uint8_t preamble              = 0x00;
+                const uint8_t StartCode[]           = {0x00, 0xFF};
                 const uint8_t HostToPn532           = 0xD4;
                 const uint8_t Pn542ToHost           = 0xD5;
                 const uint8_t DummyKey[]            = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};

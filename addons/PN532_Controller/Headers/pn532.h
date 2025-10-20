@@ -188,7 +188,7 @@ namespace NFC_Controller
             /// It waits again till the chip is ready to to send data to the host controller
             /// @param command      Command that needs to be send
             /// @return statusCode  Status of the operation
-            Result get_response();
+            Result get_response(uint8_t onCommand);
 
             /// \brief
             /// Function that handles the complete communication between the pn532 and host controller

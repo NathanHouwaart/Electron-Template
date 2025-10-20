@@ -93,5 +93,34 @@ namespace NFC_Controller
             /// It will remove preambles and trim the command to the correct size
             receivedCommand(const uint8_t* receiveBufferP, uint8_t bufferSize);
         };
+
+        // 0x00 0x00 0xff 0x15 0xeb 
+        // 0xd5 0x4b 0x01 0x01 0x03 0x44 0x20 0x07 0x04 0x1a 0x56 0x1a 0x99 0x5b 0x80 0x06 0x75 0x77 0x81 0x02 0x80 0x79 0x00 0x00
+        class pn532Response {
+        public:
+            enum class statusCode : uint8_t {
+                OK,
+                InvalidPreamble,
+                InvalidStartCode,
+                InvalidLength,
+                InvalidLengthChecksum,
+                InvalidDataChecksum,
+                InvalidDirectionByte,
+                InvalidCommandCode,
+                UnknownError
+            };
+
+            statusCode      status;
+            uint8_t         length;
+            uint8_t         finalBuffer[64];
+
+            pn532Response() :length(0), status(statusCode::UnknownError) {};
+
+            pn532Response(const uint8_t* receiveBufferP, uint8_t bufferSize, uint8_t expectedCommandCode);
+
+        private:
+            uint8_t calculateChecksum(const uint8_t* buffer, int index, uint8_t n);
+        };
+
     } //namespace Cpp
 } // namespace NFC_Controller

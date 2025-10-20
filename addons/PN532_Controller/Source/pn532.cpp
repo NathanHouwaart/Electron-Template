@@ -12,6 +12,8 @@
 #include <iostream>
 #include <iomanip>
 #include "../Headers/desfire.h"
+#include "../Headers/hex.h"
+#include "../../AddonLog.h"
 
 namespace NFC_Controller
 {
@@ -50,6 +52,7 @@ namespace NFC_Controller
             return _protocol.receive_data(buffer, nBytes);
         }
 
+        // TODO : response check
         statusCode PN532_chip::writeRegister(const uint16_t reg, const uint8_t val)
         {
 
@@ -70,7 +73,7 @@ namespace NFC_Controller
                 return result;
             }
 
-            auto [status, response] = get_response();
+            auto [status, response] = get_response(commands[0]);
             if (response.finalBuffer[3] != 0x09)
             {
                 return statusCode::pn532StatusWrongCommand;
@@ -99,7 +102,7 @@ namespace NFC_Controller
                 return readRegister;
             }
 
-            auto [status, response] = get_response();
+            auto [status, response] = get_response(commands[0]);
             if (response.finalBuffer[3] != 0x07)
             {
                 readRegister[0] = statusCode::pn532StatusWrongCommand;
@@ -134,7 +137,7 @@ namespace NFC_Controller
                 return result;
             }
 
-            auto [status, response] = get_response();
+            auto [status, response] = get_response(commands[0]);
             if (response.finalBuffer[3] == 0x0F)
             {
                 return statusCode::pn532StatusOK;
@@ -157,7 +160,7 @@ namespace NFC_Controller
                 return readGPIO;
             }
 
-            auto [status, response] = get_response();
+            auto [status, response] = get_response(commands[0]);
             if (response.finalBuffer[3] != 0x0D)
             {
                 readGPIO[0] = statusCode::pn532StatusWrongCommand;
@@ -217,7 +220,7 @@ namespace NFC_Controller
                 return true;
             }
         }
-
+       
         statusCode PN532_chip::sendAndAcknowlegdeCommand(setupSendCommand &command)
         {
             uint8_t acknowledge_buffer[6] = {};
@@ -228,11 +231,12 @@ namespace NFC_Controller
                 return statusCode::pn532StatusTimeout;
             }
 
+            std::cout << "Waiting for ACK..." << std::endl;
             getData(acknowledge_buffer, sizeof(acknowledge_buffer) / sizeof(uint8_t));
 
-            /* for (int i = 0; i < 6; i++) {
-                 std::cout << "0x" << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(ackBuffer[i]) << " ";
-             }std::cout << std::endl;*/
+            for (int i = 0; i < 6; i++) {
+                 std::cout << "0x" << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(acknowledge_buffer[i]) << " ";
+             }std::cout << std::endl;
 
             if (!checkAck(acknowledge_buffer, sizeof(acknowledge_buffer) / sizeof(uint8_t)))
             {
@@ -244,32 +248,46 @@ namespace NFC_Controller
             }
         }
 
-        Result PN532_chip::get_response()
+        Result PN532_chip::get_response(uint8_t onCommand)
         {
             if (!waitForChip(10))
             {
-                return Result{statusCode::pn532StatusTimeout, receivedCommand()};
+                return Result{statusCode::pn532StatusTimeout, pn532Response()};
             }
 
-            uint8_t databuffer1[64] = {0};
-            uint8_t databuffer2[64] = {0};
-            getData(databuffer1, 4);
-            uint8_t response_size = databuffer1[3] + 3;
-            /*std::cout << "size: "<< std::hex << std::uppercase << static_cast<int>(databuffer1[3]) << "\n";*/
-            getData(databuffer2, response_size);
-
-            for (int i = 0; i < response_size; i++)
+            uint8_t rawReceiveBuffer[512] = {0};        // large buffer to hold all incoming data
+            uint8_t index = 0;                          // index to keep track of position in buffer
+            uint32_t bytesReceived = 0;
+            // Get first 4 bytes to determine length
+            bytesReceived = getData(&rawReceiveBuffer[index], 4);
+            if(bytesReceived < 4)
             {
-                databuffer1[i + 4] = databuffer2[i];
+                return Result{statusCode::pn532StatusTimeout, pn532Response()};
             }
+            index += 4;
 
-            for (int i = 0; i < (5 + response_size); i++)
+            // Determine length of the incoming frame
+            uint8_t length = rawReceiveBuffer[3] + 3;
+            getData(&rawReceiveBuffer[index], length);
+            index += length;
+
+            // Print raw receive buffer for debugging
+            std::cout << "Received buffer: ";
+            for (int i = 0; i < index; i++)
             {
-                std::cout << "0x" << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(databuffer1[i]) << " ";
+                std::cout << "0x" << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(rawReceiveBuffer[i]) << " ";
             }
             std::cout << std::endl;
 
-            auto response = receivedCommand(databuffer1, 64);
+            // Construct receivedCommand object
+            auto response = pn532Response(rawReceiveBuffer, index, onCommand);
+
+            // Check if response is valid
+            if (response.status != pn532Response::statusCode::OK)
+            {
+                return Result{statusCode::pn532StatusFrameCheckFailed, response};
+            }
+
             return Result{statusCode::pn532StatusOK, response};
         }
 
@@ -294,7 +312,7 @@ namespace NFC_Controller
                 return result;
             }
 
-            auto [status, response] = get_response();
+            auto [status, response] = get_response(commands[0]);
 
             for (int i = 0; i < 7; i++)
             {
@@ -321,7 +339,7 @@ namespace NFC_Controller
                 return generalStatus;
             }
 
-            auto [status, response] = get_response();
+            auto [status, response] = get_response(commands[0]);
             if (status != statusCode::pn532StatusOK)
             {
                 generalStatus[0] = statusCode::pn532StatusInvalidAckFrame;
@@ -353,11 +371,17 @@ namespace NFC_Controller
                 return firmwareVersion;
             }
 
-            auto [status, response] = get_response();
-            firmwareVersion[0] = statusCode::pn532StatusOK;
+            auto [status, response] = get_response(commands[0]);
+            firmwareVersion[0] = status;
+
+            if (status != statusCode::pn532StatusOK)
+            {
+                return firmwareVersion;
+            }
+
             for (uint8_t i = 1; i < 5; i++)
             {
-                firmwareVersion[i] = response.finalBuffer[i + 3];
+                firmwareVersion[i] = response.finalBuffer[i-1];
             }
 
             return firmwareVersion;
@@ -372,13 +396,10 @@ namespace NFC_Controller
             auto command = setupSendCommand(commands, sizeof(commands) / sizeof(uint8_t));
 
             auto result = sendAndAcknowlegdeCommand(command);
-            auto [status, response] = get_response();
-            if (response.finalBuffer[3] != 0x15)
-            {
-                return statusCode::pn532statusSAMerror;
-            }
-
-            return statusCode::pn532StatusOK;
+            auto [status, response] = get_response(commands[0]);
+            
+            // Status is set by get_response
+            return status;
         }
 
         statusCode PN532_chip::RFField(const bool state)
@@ -395,13 +416,10 @@ namespace NFC_Controller
             {
                 return result;
             }
-            auto [status, response] = get_response();
-            if (response.finalBuffer[3] != 0x33)
-            {
-                return statusCode::pn532StatusWrongCommand;
-            }
+            auto [status, response] = get_response(commands[0]);
 
-            return statusCode::pn532StatusOK;
+            // Status is set by get_response
+            return status;
         }
 
         statusCode PN532_chip::setMaxRetries(const uint8_t maxRetries)
@@ -424,21 +442,117 @@ namespace NFC_Controller
                 return result;
             }
 
-            auto [status, response] = get_response();
-            if (response.finalBuffer[3] != 0x33)
-            {
-                return statusCode::pn532StatusWrongCommand;
-            }
-
-            return statusCode::pn532StatusOK;
+            auto [status, response] = get_response(commands[0]);
+            
+            return status;
         }
+
+        // bool PN532_chip::detectCard(card &cardinfo, const uint8_t nCards, const uint8_t cardtype, Ringbuffer<uint8_t, 64> *response_p)
+        // {
+        //     uint8_t commands[] = {
+        //         pn532::command::InListPassiveTarget,
+        //         nCards,
+        //         cardtype
+        //     };
+
+        //     Log("Detecting card...\n");
+
+        //     auto command = setupSendCommand(commands, sizeof(commands) / sizeof(uint8_t));
+
+        //     Log("Sending InListPassiveTarget command to NFC chip...");
+        //     for(uint8_t i = 0; i < command.length; i++){
+        //         std::cout << "0x" << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(command.finalBuffer[i]) << " ";
+        //     }std::cout << std::endl;
+
+        //     auto result = sendAndAcknowlegdeCommand(command);
+        //     if (result != statusCode::pn532StatusOK)
+        //     {
+        //         return false;
+        //     }
+
+        //     auto [status, response] = get_response(commands[0]);
+        //     if (status != statusCode::pn532StatusOK)
+        //     {
+        //         return false;
+        //     }
+            
+        //     std::cout << "InListPassiveTarget response data: ";
+        //     for (uint8_t i = 0; i < response.length; i++)
+        //     {
+        //         std::cout << Hex0x(response.finalBuffer[i]) << " ";
+        //     }
+        //     std::cout << std::endl;
+
+        //     // response.finalBuffer now contains the parsed payload (no preamble/framing)
+        //     // For InListPassiveTarget, the response format is:
+        //     // [NbTg] [Tg] [SENS_RES(2)] [SEL_RES] [NFCIDLength] [NFCID] ...
+        //     // Where NbTg = number of targets found
+
+        //     if (response.length < 1)
+        //     {
+        //         std::cout << "Response too short" << std::endl;
+        //         return false;
+        //     }
+
+        //     uint8_t numTargets = response.finalBuffer[0];
+        //     std::cout << "Number of targets found: " << int(numTargets) << std::endl;
+
+        //     if (numTargets == 0)
+        //     {
+        //         std::cout << "No card detected" << std::endl;
+        //         return false;
+        //     }
+
+        //     // Check we have enough data for UID extraction
+        //     // Minimal response: [NbTg][Tg][SENS_RES(2)][SEL_RES][NFCIDLen][NFCID...]
+        //     if (response.length < 7)
+        //     {
+        //         std::cout << "Response data too short for UID extraction" << std::endl;
+        //         return false;
+        //     }
+
+        //     // Extract UID (assuming ISO14443A Type A card, 4-byte UID)
+        //     // response.finalBuffer layout:
+        //     // [0] = NbTg (1)
+        //     // [1] = Tg (target number, usually 1)
+        //     // [2-3] = SENS_RES
+        //     // [4] = SEL_RES
+        //     // [5] = NFCID Length
+        //     // [6...] = NFCID (UID)
+
+        //     uint8_t uidLength = response.finalBuffer[5];
+        //     std::cout << "UID length: " << int(uidLength) << std::endl;
+
+        //     if (uidLength == 4 && response.length >= 10)
+        //     {
+        //         // 4-byte UID
+        //         cardinfo.setUID(response.finalBuffer[6], response.finalBuffer[7], 
+        //                        response.finalBuffer[8], response.finalBuffer[9]);
+        //         std::cout << "Card detected with UID: "
+        //                  << Hex0x(response.finalBuffer[6]) << " "
+        //                  << Hex0x(response.finalBuffer[7]) << " "
+        //                  << Hex0x(response.finalBuffer[8]) << " "
+        //                  << Hex0x(response.finalBuffer[9]) << std::endl;
+        //         return true;
+        //     }
+        //     else if (uidLength == 7 && response.length >= 13)
+        //     {
+        //         // 7-byte UID (for some cards)
+        //         std::cout << "7-byte UID detected (not yet fully supported)" << std::endl;
+        //         // For now, take first 4 bytes
+        //         cardinfo.setUID(response.finalBuffer[6], response.finalBuffer[7],
+        //                        response.finalBuffer[8], response.finalBuffer[9]);
+        //         return true;
+        //     }
+        //     else
+        //     {
+        //         std::cout << "Unexpected UID length or insufficient data" << std::endl;
+        //         return false;
+        //     }
+        // }
 
         bool PN532_chip::detectCard(card &cardinfo, const uint8_t nCards, const uint8_t cardtype, Ringbuffer<uint8_t, 64> *response_p)
         {
-            receivedCommand response;
-            uint32_t startindex = 0;
-            uint8_t response_size = 0;
-
             uint8_t commands[] = {
                 pn532::command::InListPassiveTarget,
                 nCards,
@@ -447,45 +561,98 @@ namespace NFC_Controller
 
             auto command = setupSendCommand(commands, sizeof(commands) / sizeof(uint8_t));
 
-            sendAndAcknowlegdeCommand(command);
-
-            auto response_buffer = Ringbuffer<uint8_t, 64>();
-
-            uint8_t databuffer1[64] = {0};
-            auto bytes_received = getData(databuffer1, 64);
-            for (uint32_t i = 0; i < bytes_received; i++)
+            auto result = sendAndAcknowlegdeCommand(command);
+            if (result != statusCode::pn532StatusOK)
             {
-                response_buffer.put(databuffer1[i]);
-                response_p->put(databuffer1[i]);
-            }
-            if (response_buffer.get_size() < 2)
-            {
+                std::cout << "Failed to send InListPassiveTarget command" << std::endl;
                 return false;
             }
-            for (uint32_t i = 0; i < response_buffer.get_size(); i++)
-            {
 
-                if (response_buffer[i] == 0x00 && response_buffer[i + 1] == 0x00 && response_buffer[i + 2] == 0xFF)
-                {
-                    startindex = i + 1;
-                    response_size = response_buffer[i + 3];
-                }
+            auto [status, response] = get_response(commands[0]);
+            if (status != statusCode::pn532StatusOK)
+            {
+                std::cout << "Failed to get response for InListPassiveTarget" << std::endl;
+                return false;
             }
 
-            for (int i = 0; i < response_size; i++)
+            std::cout << "InListPassiveTarget response data: ";
+            for (uint8_t i = 0; i < response.length; i++)
             {
-                databuffer1[i] = response_buffer[i + startindex];
+                std::cout << Hex0x(response.finalBuffer[i]) << " ";
+            }
+            std::cout << std::endl;
+
+            // response.finalBuffer now contains the parsed payload (no preamble/framing)
+            // For InListPassiveTarget, the response format is:
+            // [NbTg] [Tg] [SENS_RES(2)] [SEL_RES] [NFCIDLength] [NFCID] ...
+            // Where NbTg = number of targets found
+
+            if (response.length < 1)
+            {
+                std::cout << "Response too short" << std::endl;
+                return false;
             }
 
-            // 1 card has been found
-            if (databuffer1[startindex + 6] == 1)
+            uint8_t numTargets = response.finalBuffer[0];
+            std::cout << "Number of targets found: " << int(numTargets) << std::endl;
+
+            if (numTargets == 0)
             {
-                cardinfo.setUID(databuffer1[startindex + 12], databuffer1[startindex + 13], databuffer1[startindex + 14], databuffer1[startindex + 15]);
+                std::cout << "No card detected" << std::endl;
+                return false;
+            }
+
+            // Check we have enough data for UID extraction
+            // Minimal response: [NbTg][Tg][SENS_RES(2)][SEL_RES][NFCIDLen][NFCID...]
+            if (response.length < 7)
+            {
+                std::cout << "Response data too short for UID extraction" << std::endl;
+                return false;
+            }
+
+            // Extract UID (assuming ISO14443A Type A card)
+            // response.finalBuffer layout:
+            // [0] = NbTg (number of targets, usually 1)
+            // [1] = Tg (target number, usually 1)
+            // [2-3] = SENS_RES (2 bytes)
+            // [4] = SEL_RES (1 byte)
+            // [5] = NFCID Length (UID length)
+            // [6...] = NFCID (UID bytes)
+
+            uint8_t uidLength = response.finalBuffer[5];
+            std::cout << "UID length: " << int(uidLength) << std::endl;
+
+            if (uidLength == 4 && response.length >= 10)
+            {
+                // 4-byte UID
+                cardinfo.setUID(response.finalBuffer[6], response.finalBuffer[7], 
+                               response.finalBuffer[8], response.finalBuffer[9]);
+                std::cout << "Card detected with UID: "
+                         << Hex0x(response.finalBuffer[6]) << " "
+                         << Hex0x(response.finalBuffer[7]) << " "
+                         << Hex0x(response.finalBuffer[8]) << " "
+                         << Hex0x(response.finalBuffer[9]) << std::endl;
                 return true;
             }
-
-            std::cout << ".";
-            return false;
+            else if (uidLength == 7 && response.length >= 13)
+            {
+                // 7-byte UID (some DESFire and other cards)
+                std::cout << "7-byte UID detected" << std::endl;
+                // For now, use first 4 bytes (you may want to extend setUID to handle 7 bytes)
+                cardinfo.setUID(response.finalBuffer[6], response.finalBuffer[7],
+                               response.finalBuffer[8], response.finalBuffer[9]);
+                std::cout << "Card detected with UID (first 4 bytes): "
+                         << Hex0x(response.finalBuffer[6]) << " "
+                         << Hex0x(response.finalBuffer[7]) << " "
+                         << Hex0x(response.finalBuffer[8]) << " "
+                         << Hex0x(response.finalBuffer[9]) << std::endl;
+                return true;
+            }
+            else
+            {
+                std::cout << "Unexpected UID length or insufficient data" << std::endl;
+                return false;
+            }
         }
 
         bool PN532_chip::detectCard(card &cardinfo, Ringbuffer<uint8_t, 64> *response_p)
@@ -547,7 +714,7 @@ namespace NFC_Controller
                 return result;
             }
 
-            auto [status, response] = get_response();
+            auto [status, response] = get_response(commands[0]);
 
             sendData(ack_frame, ack_frame_size);
             Sleep(1);
@@ -560,30 +727,36 @@ namespace NFC_Controller
         }
 
         statusCode PN532_chip::initDataExchange(const uint8_t sendBuffer[], const uint8_t sendBufferSize, uint8_t receiveBuffer[], uint8_t& receiveBufferSize){
-            uint8_t command [64];
-            command[0] = pn532::command::InDataExchange;
-            command[1] = 0x01; // Card number 1
+            std::cout << "Initializing data exchange..." << std::endl;
+            
+            uint8_t commands [64] = {
+                pn532::command::InDataExchange,
+                0x01 // Card number 1
+            };
 
-            // std::cout << "sendbuffer: ";
-            // for(uint8_t i = 0; i < sendBufferSize; i++){
-            //     std::cout << "0x" << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(sendBuffer[i]) << " ";
-            // }
-            // std::cout << std::endl;
-                
+            std::string logMessage = "Sendbuffer size: " + std::to_string(sendBufferSize) + "\n";
+            Log(logMessage);
+
             for (uint8_t i = 0; i < sendBufferSize; i++){
-                command[i + 2] = sendBuffer[i];
+                commands[i + 2] = sendBuffer[i];
             }
 
+            std::cout << "sendbuffer: ";
+            for(uint8_t i = 0; i < sendBufferSize; i++){
+                std::cout << "0x" << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(sendBuffer[i]) << " ";
+            }
+            std::cout << std::endl;
+
             auto fullCommand = setupSendCommand(
-                command,
+                commands,
                 sendBufferSize + 2
             );
 
-            // std::cout << "Sending data exchange command..." << std::endl;
-            // for (uint8_t i = 0; i < fullCommand.length; i++){
-            //     std::cout << "0x" << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(fullCommand.finalBuffer[i]) << " ";
-            // }
-            // std::cout << std::endl;
+            std::cout << "Sending data exchange command..." << std::endl;
+            for (uint8_t i = 0; i < fullCommand.length; i++){
+                std::cout << "0x" << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(fullCommand.finalBuffer[i]) << " ";
+            }
+            std::cout << std::endl;
 
             auto result = sendAndAcknowlegdeCommand(fullCommand);
             if (result != statusCode::pn532StatusOK)
@@ -591,16 +764,21 @@ namespace NFC_Controller
                 return result;
             }
 
-            auto [status, response] = get_response();
+            auto [status, response] = get_response(commands[0]);
             if (status != statusCode::pn532StatusOK)
             {
                 return status;
             }
 
-            receiveBufferSize = response.length;
+            if(response.finalBuffer[0] != 0x00){
+                return statusCode::pn532StatusInvalidResponse;
+            }
+
+            // Trim the first byte (status byte), copy rest to receiveBuffer
+            receiveBufferSize = response.length - 1;
             for (uint8_t i = 0; i < receiveBufferSize; i++)
             {
-                receiveBuffer[i] = response.finalBuffer[i];
+                receiveBuffer[i] = response.finalBuffer[i + 1];
             }
 
             return statusCode::pn532StatusOK;
@@ -623,7 +801,7 @@ namespace NFC_Controller
         //         return result;
         //     }
 
-        //     auto [status, response] = get_response();
+        //     auto [status, response] = get_response(commands[0]);
 
         //     for (uint8_t i = 0; i < response.length; i++)
         //     {
@@ -651,7 +829,7 @@ namespace NFC_Controller
         //             return result;
         //         }
 
-        //         auto [status, response] = get_response();
+        //         auto [status, response] = get_response(commands[0]);
 
         //         for (uint8_t i = 0; i < response.length; i++)
         //         {
@@ -679,7 +857,7 @@ namespace NFC_Controller
         //             return result;
         //         }
 
-        //         auto [status, response] = get_response();
+        //         auto [status, response] = get_response(commands[0]);
 
         //         for (uint8_t i = 0; i < response.length; i++)
         //         {
@@ -725,7 +903,7 @@ namespace NFC_Controller
                 return result;
             }
 
-            auto [status, response] = get_response();
+            auto [status, response] = get_response(commands[0]);
 
             if (response.finalBuffer[4] != 0x00)
             {
@@ -762,9 +940,9 @@ namespace NFC_Controller
                 return result;
             }
 
-            auto [status, response] = get_response();
+            auto [status, response] = get_response(commands[0]);
 
-            if (response.isSucces)
+            if (response.status != pn532Response::statusCode::OK)
             {
                 result = statusCode::pn532StatusInternalBufferOverflow;
             }
@@ -798,7 +976,7 @@ namespace NFC_Controller
                 return result;
             }
 
-            auto [status, response] = get_response();
+            auto [status, response] = get_response(commands[0]);
 
             if (response.finalBuffer[4] != 0x00)
             {
@@ -885,7 +1063,7 @@ namespace NFC_Controller
                 return result;
             }
 
-            auto [status, response] = get_response();
+            auto [status, response] = get_response(commands[0]);
             if (response.finalBuffer[4] != 0x00)
             {
                 return statusCode::pn532StatusWrongCommand;
@@ -915,7 +1093,7 @@ namespace NFC_Controller
                 return result;
             }
 
-            auto [status, response] = get_response();
+            auto [status, response] = get_response(commands[0]);
             if (response.finalBuffer[4] != 0x00)
             {
                 return statusCode::pn532StatusWrongCommand;
@@ -949,7 +1127,7 @@ namespace NFC_Controller
                 return result;
             }
 
-            auto [status, response] = get_response();
+            auto [status, response] = get_response(commands[0]);
             if (response.finalBuffer[4] != 0x00)
             {
                 return statusCode::pn532StatusWrongCommand;
