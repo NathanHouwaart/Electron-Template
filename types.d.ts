@@ -10,30 +10,26 @@ type StaticData = {
   totalMem: number;
 }
 
-// Define each channel as a function type (args -> Promise<return>)
+// 1) canonical single source: define your IPC handlers here
 type IPCHandlers = {
-  statistics: () => Promise<Statistics>;
   getStaticData: () => Promise<StaticData>;
   connect: (port: string) => Promise<boolean>;
   disconnect: () => Promise<boolean>;
   getFirmwareVersion: () => Promise<string>;
+  getVersion: () => Promise<boolean>;
   listComPorts: () => Promise<{ path: string; manufacturer?: string }[]>;
 };
 
-// Derived helpers
+// 2) helpers derived from IPCHandlers
 type EventInvokeArgs = { [K in keyof IPCHandlers]: Parameters<IPCHandlers[K]> };
 type EventPayloadMapping = { [K in keyof IPCHandlers]: Awaited<ReturnType<IPCHandlers[K]>> };
 
-// Keep Window.electron typed conveniently
-type UnsubscribeFunction = () => void;
+// 3) derive the exact shape to expose on window.electron
+type ExposedElectronAPI = {
+  [K in keyof IPCHandlers]: (...args: EventInvokeArgs[K]) => ReturnType<IPCHandlers[K]>;
+};
 
+// 4) augment global Window so you only maintain IPCHandlers
 interface Window {
-  electron: {
-    subscribeStatistics: (callback: (statistics: Statistics) => void) => UnsubscribeFunction;
-    getStaticData: () => Promise<StaticData>;
-    connect: (port: string) => Promise<boolean>;
-    disconnect: () => Promise<boolean>;
-    getFirmwareVersion: () => Promise<string>;
-    listComPorts: () => Promise<{ path: string; manufacturer?: string }[]>;
-  }
+  electron: ExposedElectronAPI;
 }

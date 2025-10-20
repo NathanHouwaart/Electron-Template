@@ -1,5 +1,5 @@
 # escape=`
-FROM mcr.microsoft.com/windows/servercore:ltsc2022
+FROM abrarov/msvc-2022:latest
 
 SHELL ["powershell", "-Command"]
 RUN Set-DnsClientServerAddress -InterfaceAlias "Ethernet" -ServerAddresses 8.8.8.8,1.1.1.1; `
@@ -8,13 +8,10 @@ RUN Set-DnsClientServerAddress -InterfaceAlias "Ethernet" -ServerAddresses 8.8.8
     Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
 
 RUN Set-DnsClientServerAddress -InterfaceAlias "Ethernet" -ServerAddresses 8.8.8.8,1.1.1.1; `
-    choco install -y mingw cmake nodejs-lts
+    choco install -y nodejs --version=22.5.1 ; choco install -y cmake
 
-# Set working directory
-WORKDIR C:/app
 
-# Copy your native C++ code
-WORKDIR C:/app/native
+RUN node -v; npm -v
 
 # # Build your addon
 # RUN cmake -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release; `

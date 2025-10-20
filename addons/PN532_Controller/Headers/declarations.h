@@ -76,6 +76,11 @@ namespace NFC_Controller
             pn532statusSAMerror                 = 0x2F
         };
 
+        enum frameDirection : const uint8_t{
+            hostToPN532    = 0xD4,
+            PN532ToHost    = 0xD5
+        };
+
         /// A struct containing all 32 keys of a mifare classic 1k. Can be altered based on own card setting
         struct cardKeys{ 
                 uint8_t page1A[6]  = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
@@ -122,6 +127,7 @@ namespace NFC_Controller
                         page11B, page12B, page13B, page14B, page15B, 
                         page16B};
         };
+
 
         namespace pn532{
             /// General commands of for the pn532

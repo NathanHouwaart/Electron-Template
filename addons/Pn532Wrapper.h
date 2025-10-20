@@ -10,6 +10,7 @@ public:
     Napi::Value Disconnect(const Napi::CallbackInfo&);
 
     Napi::Value GetFirmwareVersion(const Napi::CallbackInfo&);
-
+    Napi::Value GetVersion(const Napi::CallbackInfo&);
+    
     static Napi::Function GetClass(Napi::Env);
 };

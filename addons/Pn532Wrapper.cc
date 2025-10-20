@@ -94,6 +94,32 @@ Napi::Value PN532_Wrapper::GetFirmwareVersion(const Napi::CallbackInfo& info)
     return Napi::String::New(env, firmware_string);
 }
 
+Napi::Value PN532_Wrapper::GetVersion(const Napi::CallbackInfo& info)
+{
+    Napi::Env env = info.Env();
+
+    auto cardInfo = NFC_Controller::Cpp::card();
+    uint8_t  cardType               = NFC_Controller::Cpp::pn532::command::CardType::TypeA_ISO_IEC14443;   // Cardtype we want to detect
+    uint8_t  cardNumber 	    = 0x01;
+    Ringbuffer<uint8_t, 64> response;
+
+
+    if(!m_nfc_chip->detectCard(cardInfo, cardNumber, cardType, &response)){
+        Napi::Error::New(env, "No card detected")
+            .ThrowAsJavaScriptException();
+        return Napi::Boolean::New(env, false);
+    }
+
+    auto result = m_nfc_chip->getVersion();
+    if(result != NFC_Controller::Cpp::statusCode::pn532StatusOK){
+        Napi::Error::New(env, "Failed to get version")
+            .ThrowAsJavaScriptException();
+        return Napi::Boolean::New(env, false);
+    }
+
+    return Napi::Boolean::New(env, true);
+}
+
 Napi::Function PN532_Wrapper::GetClass(Napi::Env env)
 {
     return DefineClass(
@@ -102,7 +128,8 @@ Napi::Function PN532_Wrapper::GetClass(Napi::Env env)
         {
             InstanceMethod("connect", &PN532_Wrapper::Connect),
             InstanceMethod("disconnect", &PN532_Wrapper::Disconnect),
-            InstanceMethod("getFirmwareVersion", &PN532_Wrapper::GetFirmwareVersion)
+            InstanceMethod("getFirmwareVersion", &PN532_Wrapper::GetFirmwareVersion),
+            InstanceMethod("getVersion", &PN532_Wrapper::GetVersion)
         }
     );
 }

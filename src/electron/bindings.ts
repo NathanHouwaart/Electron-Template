@@ -43,6 +43,7 @@ export interface PN532_Wrapper {
     connect(port: string): Promise<boolean>;
     disconnect(): Promise<boolean>;
     getFirmwareVersion(): string;
+    getVersion(): boolean;
 }
 
 export const MyObject: {

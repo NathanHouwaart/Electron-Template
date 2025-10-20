@@ -1,16 +1,12 @@
 const electron = require('electron');
 
 electron.contextBridge.exposeInMainWorld("electron", {
-    subscribeStatistics: (callback) => {
-        return ipcOn("statistics", (stats) => {
-            callback(stats)
-        });
-    },
     getStaticData: () => ipcInvoke("getStaticData"),
     connect: (port: string) => ipcInvoke("connect", port),
     disconnect: () => ipcInvoke("disconnect"),
     getFirmwareVersion: () => ipcInvoke("getFirmwareVersion"),
     listComPorts: () => ipcInvoke("listComPorts"),
+    getVersion: () => ipcInvoke("getVersion"),
 } satisfies Window["electron"]);
 
 

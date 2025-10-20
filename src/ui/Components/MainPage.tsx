@@ -1,95 +1,103 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  Wifi, RefreshCw, Download, Zap, Radio, CheckCircle2, Loader2, 
+import {
+  Wifi, RefreshCw, Download, Zap, Radio, CheckCircle2, Loader2,
   Info, Key, Lock, Shield, Plus, Search, Settings, Activity,
   AlertCircle, WifiOff, Circle
 } from 'lucide-react';
 
-export const ModernSidebar = () => {   
-    const [currentPage, setCurrentPage] = useState('dashboard');
-    const [selectedPort, setSelectedPort] = useState('COM3');
-    const [connectionStatus, setConnectionStatus] = useState('disconnected');
-    const [firmware, setFirmware] = useState('');
-    const [selfTestStatus, setSelfTestStatus] = useState('');
+export const ModernSidebar = () => {
+  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [selectedPort, setSelectedPort] = useState('COM3');
+  const [connectionStatus, setConnectionStatus] = useState('disconnected');
+  const [firmware, setFirmware] = useState('');
+  const [selfTestStatus, setSelfTestStatus] = useState('');
 
-    const [ports, setPorts] = useState<{ path: string; manufacturer?: string }[]>([]);
+  const [ports, setPorts] = useState<{ path: string; manufacturer?: string }[]>([]);
 
-    useEffect(() => {
-        
-        const getAvailablePorts = async () => {
-            const ports = await window.electron.listComPorts();
-            setPorts(ports);
-        };
-        getAvailablePorts();
-    }, []);
+  useEffect(() => {
 
-    const handleConnect = async () => {
-        if(connectionStatus !== 'disconnected') return;
-        if(!selectedPort) return;
-
-        window.electron.connect(selectedPort).then(
-            (result) => {
-                console.log("Result of connect:", result);
-                if(result){
-                    setConnectionStatus('connected');
-                    handleGetFirmware();
-                }else{
-                    setConnectionStatus('Error connecting');
-                    setTimeout(() => {
-                        setConnectionStatus('disconnected');
-                    }, 2000);
-                }
-            }
-        ).catch(
-            (error) => {
-                console.error("Error during connect:", error);
-                setConnectionStatus('Error connecting');
-                setTimeout(() => {
-                    setConnectionStatus('disconnected');
-                }, 2000);
-            }
-        );
-        setConnectionStatus('connecting');
+    const getAvailablePorts = async () => {
+      const ports = await window.electron.listComPorts();
+      setPorts(ports);
     };
+    getAvailablePorts();
+  }, []);
 
-    const handleDisconnect = async () => {
-        if(connectionStatus !== 'connected') return;
-        
-        window.electron.disconnect().then(
-            (result) => {
-                console.log("Result of disconnect:", result);
-                if (!result) {
-                    setConnectionStatus('Error disconnecting');
-                    setTimeout(() => {
-                        setConnectionStatus('connected');
-                    }, 2000);
-                } else {
-                    setConnectionStatus('disconnected');
-                    setFirmware('');
-                }
-            }
-        );
-        setConnectionStatus('disconnecting');
-    };
+  const handleConnect = async () => {
+    if (connectionStatus !== 'disconnected') return;
+    if (!selectedPort) return;
 
-    const handleGetFirmware = () => {
-        // if(connectionStatus !== 'connected') return;
-        window.electron.getFirmwareVersion().then(
-            (version) => {
-                setFirmware(version);
-            }
-        );
-
-    };
-
-    const handleSelfTest = () => {
-        setSelfTestStatus('running');
+    window.electron.connect(selectedPort).then(
+      (result) => {
+        console.log("Result of connect:", result);
+        if (result) {
+          setConnectionStatus('connected');
+          handleGetFirmware();
+        } else {
+          setConnectionStatus('Error connecting');
+          setTimeout(() => {
+            setConnectionStatus('disconnected');
+          }, 2000);
+        }
+      }
+    ).catch(
+      (error) => {
+        console.error("Error during connect:", error);
+        setConnectionStatus('Error connecting');
         setTimeout(() => {
-        setSelfTestStatus('passed');
+          setConnectionStatus('disconnected');
         }, 2000);
-    };
-    
-    return (
+      }
+    );
+    setConnectionStatus('connecting');
+  };
+
+  const handleDisconnect = async () => {
+    if (connectionStatus !== 'connected') return;
+
+    window.electron.disconnect().then(
+      (result) => {
+        console.log("Result of disconnect:", result);
+        if (!result) {
+          setConnectionStatus('Error disconnecting');
+          setTimeout(() => {
+            setConnectionStatus('connected');
+          }, 2000);
+        } else {
+          setConnectionStatus('disconnected');
+          setFirmware('');
+        }
+      }
+    );
+    setConnectionStatus('disconnecting');
+  };
+
+  const handleGetFirmware = () => {
+    // if(connectionStatus !== 'connected') return;
+    window.electron.getFirmwareVersion().then(
+      (version) => {
+        setFirmware(version);
+      }
+    );
+
+  };
+
+  const handleSelfTest = () => {
+    setSelfTestStatus('running');
+    setTimeout(() => {
+      setSelfTestStatus('passed');
+    }, 2000);
+  };
+
+  const handleGetVersion = () => {
+    window.electron.getVersion().then(
+      (version) => {
+        console.log("App Version:", version);
+      }
+    );
+  };
+
+  return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex">
       {/* Sidebar */}
       <div className="w-72 bg-white border-r border-slate-200 flex flex-col">
@@ -111,11 +119,10 @@ export const ModernSidebar = () => {
           <div className="bg-slate-50 rounded-lg p-3">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-slate-600">Connection</span>
-              <div className={`flex items-center gap-1.5 ${
-                connectionStatus === 'connected' ? 'text-green-600' :
-                connectionStatus === 'connecting' ? 'text-yellow-600' :
-                'text-slate-400'
-              }`}>
+              <div className={`flex items-center gap-1.5 ${connectionStatus === 'connected' ? 'text-green-600' :
+                  connectionStatus === 'connecting' ? 'text-yellow-600' :
+                    'text-slate-400'
+                }`}>
                 {connectionStatus === 'connected' ? (
                   <><Circle className="w-2 h-2 fill-current" /><span className="text-xs font-medium">Connected</span></>
                 ) : connectionStatus === 'connecting' ? (
@@ -136,33 +143,30 @@ export const ModernSidebar = () => {
           <div className="space-y-1">
             <button
               onClick={() => setCurrentPage('dashboard')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-                currentPage === 'dashboard'
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${currentPage === 'dashboard'
                   ? 'bg-blue-50 text-blue-600 font-medium'
                   : 'text-slate-600 hover:bg-slate-50'
-              }`}
+                }`}
             >
               <Key className="w-5 h-5" />
               <span>Passwords</span>
             </button>
             <button
               onClick={() => setCurrentPage('pn532')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-                currentPage === 'pn532'
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${currentPage === 'pn532'
                   ? 'bg-blue-50 text-blue-600 font-medium'
                   : 'text-slate-600 hover:bg-slate-50'
-              }`}
+                }`}
             >
               <Radio className="w-5 h-5" />
               <span>PN532 Reader</span>
             </button>
             <button
               onClick={() => setCurrentPage('settings')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-                currentPage === 'settings'
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${currentPage === 'settings'
                   ? 'bg-blue-50 text-blue-600 font-medium'
                   : 'text-slate-600 hover:bg-slate-50'
-              }`}
+                }`}
             >
               <Settings className="w-5 h-5" />
               <span>Settings</span>
@@ -186,13 +190,13 @@ export const ModernSidebar = () => {
             <div>
               <h2 className="text-2xl font-bold text-slate-800">
                 {currentPage === 'dashboard' ? 'Password Vault' :
-                 currentPage === 'pn532' ? 'PN532 Management' :
-                 'Settings'}
+                  currentPage === 'pn532' ? 'PN532 Management' :
+                    'Settings'}
               </h2>
               <p className="text-sm text-slate-500">
                 {currentPage === 'dashboard' ? 'Manage your secured passwords' :
-                 currentPage === 'pn532' ? 'Configure and test your NFC reader' :
-                 'Application preferences'}
+                  currentPage === 'pn532' ? 'Configure and test your NFC reader' :
+                    'Application preferences'}
               </p>
             </div>
             {currentPage === 'dashboard' && (
@@ -269,7 +273,7 @@ export const ModernSidebar = () => {
                       <label className="block text-sm font-medium text-slate-700 mb-2">
                         Serial Port
                       </label>
-                      <select 
+                      <select
                         value={selectedPort}
                         onChange={(e) => setSelectedPort(e.target.value)}
                         className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -281,21 +285,21 @@ export const ModernSidebar = () => {
                       </select>
                     </div>
                     <div className="flex gap-3">
-                        <button 
+                      <button
                         onClick={handleConnect}
                         disabled={connectionStatus === 'connected'}
                         className="w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-300 text-white rounded-lg font-medium transition-colors"
-                        >
+                      >
                         {connectionStatus === 'connected' ? 'Connected' : 'Connect'}
-                        </button>
+                      </button>
 
-                        <button
+                      <button
                         onClick={handleDisconnect}
                         disabled={connectionStatus !== 'connected'}
                         className="w-full px-4 py-2.5 bg-red-500 hover:bg-red-600 disabled:bg-slate-300 text-white rounded-lg font-medium transition-colors"
-                        >
+                      >
                         Disconnect
-                        </button>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -307,7 +311,7 @@ export const ModernSidebar = () => {
                     Firmware
                   </h3>
                   <div className="space-y-4">
-                    <button 
+                    <button
                       onClick={handleGetFirmware}
                       disabled={connectionStatus !== 'connected'}
                       className="w-full px-4 py-2.5 bg-purple-500 hover:bg-purple-600 disabled:bg-slate-300 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
@@ -331,7 +335,7 @@ export const ModernSidebar = () => {
                     Self Test
                   </h3>
                   <div className="space-y-4">
-                    <button 
+                    <button
                       onClick={handleSelfTest}
                       disabled={connectionStatus !== 'connected'}
                       className="px-6 py-2.5 bg-green-500 hover:bg-green-600 disabled:bg-slate-300 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
@@ -340,10 +344,46 @@ export const ModernSidebar = () => {
                       Run Self Test
                     </button>
                     {selfTestStatus && (
-                      <div className={`p-4 rounded-lg border flex items-center gap-3 ${
-                        selfTestStatus === 'passed' ? 'bg-green-50 border-green-200' :
-                        'bg-yellow-50 border-yellow-200'
-                      }`}>
+                      <div className={`p-4 rounded-lg border flex items-center gap-3 ${selfTestStatus === 'passed' ? 'bg-green-50 border-green-200' :
+                          'bg-yellow-50 border-yellow-200'
+                        }`}>
+                        {selfTestStatus === 'passed' ? (
+                          <CheckCircle2 className="w-5 h-5 text-green-600" />
+                        ) : (
+                          <Loader2 className="w-5 h-5 text-yellow-600 animate-spin" />
+                        )}
+                        <div>
+                          <div className="font-semibold text-sm text-slate-800">
+                            {selfTestStatus === 'passed' ? 'All Tests Passed' : 'Running Tests...'}
+                          </div>
+                          <div className="text-xs text-slate-600">
+                            {selfTestStatus === 'passed' ? 'Device is functioning correctly' : 'Please wait...'}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Self Test Card */}
+                <div className="bg-white border border-slate-200 rounded-xl p-6 lg:col-span-2">
+                  <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-green-500" />
+                    GetVersion
+                  </h3>
+                  <div className="space-y-4">
+                    <button
+                      onClick={handleGetVersion}
+                      disabled={connectionStatus !== 'connected'}
+                      className="px-6 py-2.5 bg-green-500 hover:bg-green-600 disabled:bg-slate-300 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                    >
+                      <Zap className="w-4 h-4" />
+                      Get Version
+                    </button>
+                    {selfTestStatus && (
+                      <div className={`p-4 rounded-lg border flex items-center gap-3 ${selfTestStatus === 'passed' ? 'bg-green-50 border-green-200' :
+                          'bg-yellow-50 border-yellow-200'
+                        }`}>
                         {selfTestStatus === 'passed' ? (
                           <CheckCircle2 className="w-5 h-5 text-green-600" />
                         ) : (
@@ -395,7 +435,7 @@ export const ModernSidebar = () => {
         </div>
       </div>
     </div>
-    );
+  );
 };
 
 export default ModernSidebar;

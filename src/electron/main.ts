@@ -67,3 +67,9 @@ ipcMain.handle('listComPorts', async () => {
   console.log(ports);
   return ports.map(p => ({ path: p.path, manufacturer: p.manufacturer }));
 });
+
+ipcMain.handle('getVersion', () => {
+  console.log('ipcMain: getVersion called');
+  const obj = new PN532_Wrapper();
+  return obj.getVersion();
+});

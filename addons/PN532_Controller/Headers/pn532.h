@@ -304,6 +304,21 @@ namespace NFC_Controller
             /// @return statusCode  Status of the operation
             statusCode setSerialBaudrate(const baudRate br) override;
 
+            /// \brief
+            /// This function initialises a data exchange between the pn532 and a nfc card
+            /// \details
+            /// @param  sendBuffer       Pointer to the buffer containing the data to send
+            /// @param  sendBufferSize   Size of the send buffer
+            /// @param  receiveBuffer    Pointer to the buffer to store the received data
+            /// @param  receiveBufferSize Size of the receive buffer
+            /// @return statusCode      Status of the operation
+            statusCode initDataExchange(const uint8_t sendBuffer[], const uint8_t sendBufferSize, uint8_t receiveBuffer[], uint8_t& receiveBufferSize) override;
+
+            /// \brief
+            /// This function gets the version of the pn532 chip
+            /// \details
+            /// @return statusCode  Status of the operation
+            statusCode getVersion() override;
 
             // ------------------------------------------------------------------------------- //
             // Mifare specific functions                                                       //

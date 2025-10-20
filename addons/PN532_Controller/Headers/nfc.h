@@ -192,6 +192,8 @@ namespace NFC_Controller
 
             virtual bool detectCard(card& cardinfo, Ringbuffer<uint8_t, 64>* response) = 0;
 
+            virtual statusCode getVersion() = 0;
+
             /// \brief
             /// Abstract function to select / or deselect a specific card that is in the nfc's rf field.
             /// \details
@@ -229,6 +231,19 @@ namespace NFC_Controller
             /// @param  br          Baudrate the serial communication needs to be changed to
             /// @return statuscode  Status of the operation
             virtual statusCode setSerialBaudrate(const baudRate br) = 0;
+
+            /// \brief
+            /// Abstract function to initialise a data exchange between the nfc chip and a nfc card
+            /// \details
+            /// This function will initiate a data exchange between the NFC chip and a NFC card.
+            /// It will send the data in the sendBuffer to the card and wait for a response.
+            /// The response will be stored in the receiveBuffer.
+            /// @param  sendBuffer      Pointer to the data to be sent
+            /// @param  sendBufferSize  Size of the data to be sent
+            /// @param  receiveBuffer   Pointer to the buffer to store the received data
+            /// @param  receiveBufferSize Size of the receive buffer
+            /// @return statusCode     Status of the operation
+            virtual statusCode initDataExchange(const uint8_t sendBuffer[], const uint8_t sendBufferSize, uint8_t receiveBuffer[], uint8_t& receiveBufferSize) = 0;
 
 
             // ------------------------------------------------------------------------------- //

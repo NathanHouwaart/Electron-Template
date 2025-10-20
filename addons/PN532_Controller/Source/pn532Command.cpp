@@ -15,18 +15,18 @@ namespace NFC_Controller
     {
         setupSendCommand::setupSendCommand(const uint8_t* commandsToSend, uint8_t commandSize)
         {
-            finalbuffer[0] = pn532::general::Preamble1;
-            finalbuffer[1] = pn532::general::Preamble2;
-            finalbuffer[2] = commandSize + static_cast<uint8_t>(1);
-            finalbuffer[3] = calculateChecksum(finalbuffer, 2, 1);
-            finalbuffer[4] = pn532::general::HostToPn532;
+            finalBuffer[0] = pn532::general::Preamble1;
+            finalBuffer[1] = pn532::general::Preamble2;
+            finalBuffer[2] = commandSize + static_cast<uint8_t>(1);
+            finalBuffer[3] = calculateChecksum(finalBuffer, 2, 1);
+            finalBuffer[4] = pn532::general::HostToPn532;
             uint8_t commandBufferIndex = 5;
             for (int i = 0; i < commandSize; i++)
             {
-                finalbuffer[commandBufferIndex] = commandsToSend[i];
+                finalBuffer[commandBufferIndex] = commandsToSend[i];
                 commandBufferIndex++;
             }
-            finalbuffer[commandBufferIndex] = calculateChecksum(finalbuffer, startCommand, commandSize + static_cast<uint8_t>(1));
+            finalBuffer[commandBufferIndex] = calculateChecksum(finalBuffer, startCommand, commandSize + static_cast<uint8_t>(1));
             length = commandBufferIndex + static_cast<uint8_t>(1);
             ;
         }

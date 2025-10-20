@@ -47,7 +47,7 @@ namespace NFC_Controller
         public:
             uint8_t length;
             uint8_t startCommand = 4;
-            uint8_t finalbuffer[64];
+            uint8_t finalBuffer[64];
 
             /// \brief
             /// Constructor for setupSendCommand
@@ -73,9 +73,11 @@ namespace NFC_Controller
         /// The appropriate constructors and operators are provided
         class __declspec(dllexport) receivedCommand {
         public:
-            uint8_t length;
-            bool isSucces;
-            uint8_t finalBuffer[64];
+            // todo: implement error here, and implement the first frame bytes extraction so
+            // that direction and error bytes can be extracted properly
+            uint8_t         length;
+            bool            isSucces;
+            uint8_t         finalBuffer[64];        // trimmed buffer containing received data plus some info
 
             /// \brief
             /// Default constructor for a received command
