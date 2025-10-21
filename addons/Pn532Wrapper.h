@@ -11,6 +11,7 @@ public:
 
     Napi::Value GetFirmwareVersion(const Napi::CallbackInfo&);
     Napi::Value GetVersion(const Napi::CallbackInfo&);
+    Napi::Value RunSelfTests(const Napi::CallbackInfo&);
     
     static Napi::Function GetClass(Napi::Env);
 };

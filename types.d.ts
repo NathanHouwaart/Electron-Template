@@ -10,6 +10,16 @@ type StaticData = {
   totalMem: number;
 }
 
+type SelfTestUpdate = {
+  test: string;
+  status: 'pending' | 'running' | 'success' | 'failed';
+}
+
+type RendererEvents = {
+  'self-test-progress': SelfTestUpdate;
+  'self-test-complete': { error: Error | null; result: boolean };
+}
+
 // 1) canonical single source: define your IPC handlers here
 type IPCHandlers = {
   getStaticData: () => Promise<StaticData>;
@@ -28,7 +38,10 @@ type EventPayloadMapping = { [K in keyof IPCHandlers]: Awaited<ReturnType<IPCHan
 type ExposedElectronAPI = {
   [K in keyof IPCHandlers]: (...args: EventInvokeArgs[K]) => ReturnType<IPCHandlers[K]>;
 } & {
-  onSelfTestProgress: (callback: (payload: SelfTestUpdate) => void) => () => void;
+  runSelfTests: (
+    progressCallback: (result: SelfTestUpdate) => void,
+    completeCallback: (error: Error | null, result: boolean) => void
+  ) => void;
 };
 
 // 4) augment global Window so you only maintain IPCHandlers

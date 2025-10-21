@@ -6,6 +6,8 @@
 #include <vector>
 #include <string>
 #include <utility>
+#include <thread>
+#include <chrono>
 #include "AddonLog.h"
 #include "PN532_Controller/Headers/Commands/getFirmwareVersion.h"
 #include "PN532_Controller/Headers/Commands/performSelfTestCommand.h"
@@ -14,6 +16,109 @@ using namespace Napi;
 
 std::unique_ptr<NFC_Controller::Cpp::SerialCommunication> m_protocol = std::make_unique<NFC_Controller::Cpp::SerialCommunication>();
 std::unique_ptr<NFC_Controller::Cpp::PN532_chip> m_nfc_chip = std::make_unique<NFC_Controller::Cpp::PN532_chip>(*m_protocol);
+
+// -----------------------------------------------------------------------------
+// Self Test Async Worker
+// -----------------------------------------------------------------------------
+
+class SelfTestWorker : public Napi::AsyncProgressWorker<std::pair<std::string, std::string>>
+{
+public:
+    SelfTestWorker(Napi::Function &callback, Napi::Function &progress)
+        : Napi::AsyncProgressWorker<std::pair<std::string, std::string>>(callback),
+          progressCallback(Napi::Persistent(progress))
+    {
+    }
+
+    void Execute(const ExecutionProgress &progress) override
+    {
+        using PerformSelfTestCommand = NFC_Controller::Cpp::PerformSelfTestCommand;
+        using Options = PerformSelfTestCommand::Options;
+
+        // ROM Self-test
+        auto romRunning = std::make_pair(std::string("rom"), std::string("running"));
+        progress.Send(&romRunning, 1);
+        auto romCommand = PerformSelfTestCommand(Options{.test = PerformSelfTestCommand::Test::RomChecksum});
+        auto romResult = m_nfc_chip->executeCommand(romCommand);
+        std::string romStatus = (int(romResult.status) == 0) ? "success" : "failed";
+        auto romComplete = std::make_pair(std::string("rom"), romStatus);
+        progress.Send(&romComplete, 1);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        // RAM Self-test
+        auto ramRunning = std::make_pair(std::string("ram"), std::string("running"));
+        progress.Send(&ramRunning, 1);
+        auto ramCommand = PerformSelfTestCommand(Options{.test = PerformSelfTestCommand::Test::RamIntegrity});
+        auto ramResult = m_nfc_chip->executeCommand(ramCommand);
+        std::string ramStatus = (int(ramResult.status) == 0) ? "success" : "failed";
+        auto ramComplete = std::make_pair(std::string("ram"), ramStatus);
+        progress.Send(&ramComplete, 1);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        // Communication Line Test
+        auto commRunning = std::make_pair(std::string("communication"), std::string("running"));
+        progress.Send(&commRunning, 1);
+        auto commCommand = PerformSelfTestCommand(Options{
+            .test = PerformSelfTestCommand::Test::CommunicationLine,
+            .parameters = {0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA}});
+        auto commResult = m_nfc_chip->executeCommand(commCommand);
+        std::string commStatus = (int(commResult.status) == 0) ? "success" : "failed";
+        auto commComplete = std::make_pair(std::string("communication"), commStatus);
+        progress.Send(&commComplete, 1);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        // Echo Back Test
+        auto echoRunning = std::make_pair(std::string("echo"), std::string("running"));
+        progress.Send(&echoRunning, 1);
+        auto echoCommand = PerformSelfTestCommand(Options{
+            .test = PerformSelfTestCommand::Test::EchoBack,
+            .parameters = {0xBA, 0xAD, 0xF0, 0x0D, 0x12, 0x34, 0x56, 0x78}});
+        auto echoResult = m_nfc_chip->executeCommand(echoCommand);
+        std::string echoStatus = (int(echoResult.status) == 0) ? "success" : "failed";
+        auto echoComplete = std::make_pair(std::string("echo"), echoStatus);
+        progress.Send(&echoComplete, 1);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        // Antenna Continuity Test
+        auto antennaRunning = std::make_pair(std::string("antenna"), std::string("running"));
+        progress.Send(&antennaRunning, 1);
+        auto antennaCommand = PerformSelfTestCommand(Options{
+            .test = PerformSelfTestCommand::Test::AntennaContinuity,
+            .parameters = {PerformSelfTestCommand::makeAntennaThreshold(
+                static_cast<uint8_t>(1u << 1),
+                static_cast<uint8_t>(1u << 0),
+                true, true)}});
+        auto antennaResult = m_nfc_chip->executeCommand(antennaCommand);
+        std::string antennaStatus = (int(antennaResult.status) == 0) ? "success" : "failed";
+        auto antennaComplete = std::make_pair(std::string("antenna"), antennaStatus);
+        progress.Send(&antennaComplete, 1);
+    }
+
+    void OnProgress(const std::pair<std::string, std::string> *data, size_t count) override
+    {
+        Napi::HandleScope scope(Env());
+        for (size_t i = 0; i < count; i++)
+        {
+            Napi::Object result = Napi::Object::New(Env());
+            result.Set("test", data[i].first);
+            result.Set("status", data[i].second);
+            progressCallback.Value().Call({result});
+        }
+    }
+
+    void OnOK() override
+    {
+        Callback().Call({Env().Null(), Napi::Boolean::New(Env(), true)});
+    }
+
+    void OnError(const Napi::Error &error) override
+    {
+        Callback().Call({error.Value(), Env().Undefined()});
+    }
+
+private:
+    Napi::FunctionReference progressCallback;
+};
 
 // -----------------------------------------------------------------------------
 // PN532 Wrapper class declaration
@@ -186,6 +291,25 @@ Napi::Value PN532_Wrapper::GetVersion(const Napi::CallbackInfo &info)
     return Napi::Boolean::New(env, true);
 }
 
+Napi::Value PN532_Wrapper::RunSelfTests(const Napi::CallbackInfo &info)
+{
+    Napi::Env env = info.Env();
+
+    if (info.Length() < 2 || !info[0].IsFunction() || !info[1].IsFunction())
+    {
+        Napi::TypeError::New(env, "Expected two callback functions (progress, complete)")
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+
+    Napi::Function progressCallback = info[0].As<Napi::Function>();
+    Napi::Function completeCallback = info[1].As<Napi::Function>();
+
+    SelfTestWorker *worker = new SelfTestWorker(completeCallback, progressCallback);
+    worker->Queue();
+
+    return env.Undefined();
+}
 
 Napi::Function PN532_Wrapper::GetClass(Napi::Env env)
 {
@@ -196,5 +320,6 @@ Napi::Function PN532_Wrapper::GetClass(Napi::Env env)
          InstanceMethod("disconnect", &PN532_Wrapper::Disconnect),
          InstanceMethod("getFirmwareVersion", &PN532_Wrapper::GetFirmwareVersion),
          InstanceMethod("getVersion", &PN532_Wrapper::GetVersion),
+         InstanceMethod("runSelfTests", &PN532_Wrapper::RunSelfTests),
         });
 }

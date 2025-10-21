@@ -73,3 +73,19 @@ ipcMain.handle('getVersion', () => {
   const obj = new PN532_Wrapper();
   return obj.getVersion();
 });
+
+ipcMain.on('run-self-tests', (event) => {
+  console.log('ipcMain: run-self-tests called');
+  const obj = new PN532_Wrapper();
+  
+  obj.runSelfTests(
+    // Progress callback
+    (result: { test: string; status: string }) => {
+      event.sender.send('self-test-progress', result);
+    },
+    // Complete callback
+    (error: Error | null, complete: boolean) => {
+      event.sender.send('self-test-complete', error, complete);
+    }
+  );
+});

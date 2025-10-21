@@ -1,16 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  Wifi, RefreshCw, Download, Zap, Radio, CheckCircle2, Loader2,
+  Wifi, Download, Zap, Radio, Loader2,
   Info, Key, Lock, Shield, Plus, Search, Settings, Activity,
-  AlertCircle, WifiOff, Circle
+  WifiOff, Circle
 } from 'lucide-react';
+import { SelfTestPanel } from './SelfTestPanel';
 
 export const ModernSidebar = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [selectedPort, setSelectedPort] = useState('COM3');
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [firmware, setFirmware] = useState('');
-  const [selfTestStatus, setSelfTestStatus] = useState('');
 
   const [ports, setPorts] = useState<{ path: string; manufacturer?: string }[]>([]);
 
@@ -80,13 +80,6 @@ export const ModernSidebar = () => {
       }
     );
 
-  };
-
-  const handleSelfTest = () => {
-    setSelfTestStatus('running');
-    setTimeout(() => {
-      setSelfTestStatus('passed');
-    }, 2000);
   };
 
   const handleGetVersion = () => {
@@ -329,47 +322,15 @@ export const ModernSidebar = () => {
                 </div>
 
                 {/* Self Test Card */}
-                <div className="bg-white border border-slate-200 rounded-xl p-6 lg:col-span-2">
-                  <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
-                    <Activity className="w-5 h-5 text-green-500" />
-                    Self Test
-                  </h3>
-                  <div className="space-y-4">
-                    <button
-                      onClick={handleSelfTest}
-                      disabled={connectionStatus !== 'connected'}
-                      className="px-6 py-2.5 bg-green-500 hover:bg-green-600 disabled:bg-slate-300 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-                    >
-                      <Zap className="w-4 h-4" />
-                      Run Self Test
-                    </button>
-                    {selfTestStatus && (
-                      <div className={`p-4 rounded-lg border flex items-center gap-3 ${selfTestStatus === 'passed' ? 'bg-green-50 border-green-200' :
-                          'bg-yellow-50 border-yellow-200'
-                        }`}>
-                        {selfTestStatus === 'passed' ? (
-                          <CheckCircle2 className="w-5 h-5 text-green-600" />
-                        ) : (
-                          <Loader2 className="w-5 h-5 text-yellow-600 animate-spin" />
-                        )}
-                        <div>
-                          <div className="font-semibold text-sm text-slate-800">
-                            {selfTestStatus === 'passed' ? 'All Tests Passed' : 'Running Tests...'}
-                          </div>
-                          <div className="text-xs text-slate-600">
-                            {selfTestStatus === 'passed' ? 'Device is functioning correctly' : 'Please wait...'}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                <div className="lg:col-span-2">
+                  <SelfTestPanel isConnected={connectionStatus === 'connected'} />
                 </div>
 
-                {/* Self Test Card */}
+                {/* Get Version Card */}
                 <div className="bg-white border border-slate-200 rounded-xl p-6 lg:col-span-2">
                   <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
                     <Activity className="w-5 h-5 text-green-500" />
-                    GetVersion
+                    Debug Version
                   </h3>
                   <div className="space-y-4">
                     <button
@@ -378,27 +339,8 @@ export const ModernSidebar = () => {
                       className="px-6 py-2.5 bg-green-500 hover:bg-green-600 disabled:bg-slate-300 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
                     >
                       <Zap className="w-4 h-4" />
-                      Get Version
+                      Get Version (Debug)
                     </button>
-                    {selfTestStatus && (
-                      <div className={`p-4 rounded-lg border flex items-center gap-3 ${selfTestStatus === 'passed' ? 'bg-green-50 border-green-200' :
-                          'bg-yellow-50 border-yellow-200'
-                        }`}>
-                        {selfTestStatus === 'passed' ? (
-                          <CheckCircle2 className="w-5 h-5 text-green-600" />
-                        ) : (
-                          <Loader2 className="w-5 h-5 text-yellow-600 animate-spin" />
-                        )}
-                        <div>
-                          <div className="font-semibold text-sm text-slate-800">
-                            {selfTestStatus === 'passed' ? 'All Tests Passed' : 'Running Tests...'}
-                          </div>
-                          <div className="text-xs text-slate-600">
-                            {selfTestStatus === 'passed' ? 'Device is functioning correctly' : 'Please wait...'}
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>

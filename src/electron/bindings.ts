@@ -43,6 +43,10 @@ export interface PN532_Wrapper {
     disconnect(): Promise<boolean>;
     getFirmwareVersion(): string;
     getVersion(): boolean;
+    runSelfTests(
+        progressCallback: (result: { test: string; status: string }) => void,
+        completeCallback: (error: Error | null, complete: boolean) => void
+    ): void;
 }
 
 export const MyObject: {
