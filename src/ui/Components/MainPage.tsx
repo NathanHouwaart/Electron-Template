@@ -23,6 +23,18 @@ export const ModernSidebar = () => {
     getAvailablePorts();
   }, []);
 
+  // Listen for device disconnect events and reset UI state
+  useEffect(() => {
+    const unsub = window.electron.onDeviceDisconnected(() => {
+      setConnectionStatus('disconnected');
+      setFirmware('');
+      setSelectedPort('');
+      // Refresh ports list
+      window.electron.listComPorts().then((p) => setPorts(p));
+    });
+    return () => unsub();
+  }, []);
+
   const handleConnect = async () => {
     if (connectionStatus !== 'disconnected') return;
     if (!selectedPort) return;

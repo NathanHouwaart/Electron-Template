@@ -18,10 +18,12 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('[FATAL] Unhandled rejection at:', promise, 'reason:', reason);
 });
 
+let mainWindow: BrowserWindow | null = null;
+
 app.on('ready', () => {
   console.log('[MAIN.TS] App ready event fired');
 
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
     webPreferences: {
@@ -53,7 +55,11 @@ ipcMain.handle('disconnect', async () => {
   console.log('ipcMain: disconnect called');
 
   const obj = new PN532_Wrapper();
-  return obj.disconnect();
+  const res = await obj.disconnect();
+  if (res && mainWindow) {
+    mainWindow.webContents.send('device-disconnected');
+  }
+  return res;
 });
 
 ipcMain.handle('getFirmwareVersion', () => {

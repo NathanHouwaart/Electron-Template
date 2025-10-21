@@ -27,6 +27,11 @@ electron.contextBridge.exposeInMainWorld("electron", {
         // Trigger the self-test
         electron.ipcRenderer.send('run-self-tests');
     },
+    onDeviceDisconnected: (callback: () => void) => {
+        const cb = () => callback();
+        electron.ipcRenderer.on('device-disconnected', cb);
+        return () => electron.ipcRenderer.off('device-disconnected', cb);
+    },
 } satisfies Window["electron"]);
 
 

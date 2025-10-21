@@ -42,6 +42,7 @@ type ExposedElectronAPI = {
     progressCallback: (result: SelfTestUpdate) => void,
     completeCallback: (error: Error | null, result: boolean) => void
   ) => void;
+  onDeviceDisconnected: (callback: () => void) => () => void;
 };
 
 // 4) augment global Window so you only maintain IPCHandlers

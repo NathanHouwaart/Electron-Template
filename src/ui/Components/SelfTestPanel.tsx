@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Loader2, CheckCircle2, XCircle, Circle, Activity } from 'lucide-react';
 
 type TestStatus = 'pending' | 'running' | 'success' | 'failed';
@@ -38,6 +38,16 @@ export const SelfTestPanel: React.FC<SelfTestPanelProps> = ({ isConnected }) => 
   });
   const [isRunning, setIsRunning] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+
+  // Reset tests when device is disconnected
+  useEffect(() => {
+    const unsub = window.electron.onDeviceDisconnected(() => {
+      setIsRunning(false);
+      setShowDetails(false);
+      setTests({ rom: 'pending', ram: 'pending', communication: 'pending', echo: 'pending', antenna: 'pending' });
+    });
+    return () => unsub();
+  }, []);
 
   const runSelfTests = () => {
     setIsRunning(true);
@@ -135,7 +145,7 @@ export const SelfTestPanel: React.FC<SelfTestPanelProps> = ({ isConnected }) => 
 
       {/* Test Results */}
       {showDetails ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
           {testInfo.map((test) => {
             const status = tests[test.key];
             return (
@@ -143,17 +153,17 @@ export const SelfTestPanel: React.FC<SelfTestPanelProps> = ({ isConnected }) => 
                 key={test.key}
                 className={`flex items-center justify-between px-3 py-2 border rounded-md transition-all ${getStatusColor(status)}`}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                   {getIcon(status)}
-                  <div>
-                    <div className="font-medium text-sm text-slate-800">{test.label}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm text-slate-800 truncate">{test.label}</div>
                     {showDetails && (
-                      <div className="text-xs text-slate-600 mt-0.5">{test.description}</div>
+                      <div className="text-xs text-slate-600 mt-0.5 truncate">{test.description}</div>
                     )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-slate-700 capitalize min-w-[60px] text-right">
+                  <span className="flex-shrink-0 text-sm font-medium text-slate-700 capitalize min-w-[72px] truncate text-right">
                     {status}
                   </span>
                 </div>
