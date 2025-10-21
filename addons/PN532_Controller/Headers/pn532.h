@@ -1,28 +1,28 @@
 /**
  * @file
  * @brief    Implementation of the Abstract NFC interface for the pn532
- * 
+ *
  * This file provides an implementation of the Abstract NFC interface class that can be used by a pn532.
- * @note    Not all commands that he pn532 provides are supported by this library, but the vast majority 
- *          is implemented. 
- * 
- * This file contains detailled doxygen lines, but if a particulair function of thepn532 is not clear, plese 
+ * @note    Not all commands that he pn532 provides are supported by this library, but the vast majority
+ *          is implemented.
+ *
+ * This file contains detailled doxygen lines, but if a particulair function of thepn532 is not clear, plese
  * refer to the user manual of this chip:
- * https://www.nxp.com/docs/en/user-guide/141520.pdf 
- * 
+ * https://www.nxp.com/docs/en/user-guide/141520.pdf
+ *
  * You can also refer to the application note in order to see how the pn532 is used to read cards/ etc:
- * https://www.nxp.com/docs/en/nxp/application-notes/AN133910.pdf 
- * 
+ * https://www.nxp.com/docs/en/nxp/application-notes/AN133910.pdf
+ *
  * The pn532 is manufactured by NXP®. All rights reserved
- * 
- * PN532 NFC RFID Module is a highly integrated transmission module for Near Field Communication at 13.56MHz. With the mode 
- * switch on board, you can change easily between I2C, SPI, and UART modes. The integrated level shifter provides 3.3V or 5V 
- * working voltage for your choice. In addition, it supports RFID reading and writing, and NFC function with Android phone, 
- * which makes it quite convenient for wireless connection. This module is equipped with two 3mm mounting holes, of which the 
+ *
+ * PN532 NFC RFID Module is a highly integrated transmission module for Near Field Communication at 13.56MHz. With the mode
+ * switch on board, you can change easily between I2C, SPI, and UART modes. The integrated level shifter provides 3.3V or 5V
+ * working voltage for your choice. In addition, it supports RFID reading and writing, and NFC function with Android phone,
+ * which makes it quite convenient for wireless connection. This module is equipped with two 3mm mounting holes, of which the
  * small dimension makes it easy for using in your project! (source: http://wiki.sunfounder.cc/index.php?title=PN532_NFC_RFID_Module )
- * 
+ *
  * Note: When your wiring is correct (no short circuit), the module may be a little heated, which is just normal for use.
- * 
+ *
  * @author    Nathan Houwaart
  * @license   See LICENSE
  */
@@ -32,6 +32,7 @@
 #include <stdint.h>
 #include "nfc.h"
 #include "pn532Command.h"
+#include "command.h"
 
 namespace NFC_Controller
 {
@@ -39,8 +40,10 @@ namespace NFC_Controller
     {
         /// \brief
         /// Implementation of the NFC class specificly for the pn532
-        class __declspec(dllexport) PN532_chip : public NFC {
+        class __declspec(dllexport) PN532_chip : public NFC
+        {
         public:
+            CommandResult executeCommand(IPn532Command &command);
 
             // ------------------------------------------------------------------------------- //
             // Constructor                                                                     //
@@ -53,23 +56,20 @@ namespace NFC_Controller
             /// @param display      A display the chip can display information on
             /// @param irq          Adress of the irq pin
             PN532_chip(
-                communication::protocol& _protocol
-            );
+                communication::protocol &_protocol);
 
-
-            // ------------------------------------------------------------------------------- //   
+            // ------------------------------------------------------------------------------- //
             // Basic function(s)                                                               //
             // ------------------------------------------------------------------------------- //
 
             /// \brief
             /// This function initialises the pn532 chip
             /// \details
-            /// The pn532 is asleep by default. 
+            /// The pn532 is asleep by default.
             /// By calling the init funciton the pn532 will be taken out of sleep mode
-            /// Source : https://www.nxp.com/docs/en/user-guide/141520.pdf 
+            /// Source : https://www.nxp.com/docs/en/user-guide/141520.pdf
             /// P. 99    section 7.2.11
             void init() override;
-
 
             // ------------------------------------------------------------------------------- //
             // Basic communciation functions                                                   //
@@ -80,8 +80,8 @@ namespace NFC_Controller
             /// \details
             /// When called, this funciton will send n_bytes over the provided interface for the class
             /// @param commandBuffer    Pointer to the commandBuffer we want to send
-            /// @param n_bytes          Amount of bytes that needs to be send 
-            void sendData(uint8_t* commandBuffer, const uint8_t nBytes) override;
+            /// @param n_bytes          Amount of bytes that needs to be send
+            void sendData(uint8_t *commandBuffer, const uint8_t nBytes) override;
 
             /// \brief
             /// This function gets data from the pn532 over the provided interface
@@ -89,7 +89,7 @@ namespace NFC_Controller
             /// When called, this funciton will get n_bytes over the provided interface for the class
             /// @param buffer       Pointer to the buffer we want to store received data in
             /// @param n_bytes      Amount of bytes that needs to be read
-            uint32_t getData(uint8_t* buffer, const uint8_t nBytes) override;
+            uint32_t getData(uint8_t *buffer, const uint8_t nBytes) override;
 
             /// \brief
             /// This function is used to overwrite the content of a internal register of the pn532
@@ -127,8 +127,8 @@ namespace NFC_Controller
             ///     newPinState[6] = -          Not used
             ///     newPinState[7] = -          Not used
             ///
-            /// Source : https://www.nxp.com/docs/en/user-guide/141520.pdf 
-            /// P. 81   section 7.2.7   
+            /// Source : https://www.nxp.com/docs/en/user-guide/141520.pdf
+            /// P. 81   section 7.2.7
             /// @return statusCode  Status of the operation
             statusCode writeGPIO(uint8_t newPinState) override;
 
@@ -138,7 +138,7 @@ namespace NFC_Controller
             /// Returns an 8 bit value containing the pin state for each GPIO pin of the pn532
             /// The layout of the return byte is as follows (index 0 being the LSB) :
             ///
-            ///     uint8_t[0] = P30 
+            ///     uint8_t[0] = P30
             ///     uint8_t[1] = P31
             ///     uint8_t[2] = P32
             ///     uint8_t[3] = P33
@@ -147,12 +147,11 @@ namespace NFC_Controller
             ///     uint8_t[6] = P71
             ///     uint8_t[7] = P72
             ///
-            /// Source : https://www.nxp.com/docs/en/user-guide/141520.pdf 
+            /// Source : https://www.nxp.com/docs/en/user-guide/141520.pdf
             /// P. 79   section 7.2.6
-            /// @return array[0]    Status of the operation   
+            /// @return array[0]    Status of the operation
             /// @return array[1]    Pin status for each GPIO pin
             std::array<uint8_t, 2> readGPIO() override;
-
 
             // ------------------------------------------------------------------------------- //
             // More basic functions                                                            //
@@ -162,7 +161,7 @@ namespace NFC_Controller
             /// This function checks wether the pn532 has responded within the given timeout
             /// \details
             /// Will return false if the pn532 didnt respond in time
-            /// @param timeout          Maximum time the arduino needs to wait for a response of the pn532 
+            /// @param timeout          Maximum time the arduino needs to wait for a response of the pn532
             /// @return true            Chip responded in time
             /// @return false           Chip didnt respond in time
             bool waitForChip(const int timeout = 2000) override;
@@ -177,7 +176,19 @@ namespace NFC_Controller
             /// @param n                Size of the ack buffer
             /// @return true            ACK == ok;
             /// @return false           ACK != ok;
-            bool checkAck(const uint8_t* buffer, const uint8_t n) override;
+            bool checkAck(const uint8_t *buffer, const uint8_t n) override;
+
+            /// \brief
+            /// Function that handles the complete communication between the pn532 and host controller
+            /// \details
+            /// This function will send a command to the pn532
+            /// It waits till the chip responds
+            /// It checks if the pn532 has send an ACKnowlege frame
+            /// It waits again till the chip is ready to to send data to the host controller
+            /// @param command      Command that needs to be send
+            /// @param timeoutMs    Maximum time to wait for the response frame (milliseconds)
+            /// @return statusCode  Status of the operation
+            Result get_response(uint8_t onCommand, uint32_t timeoutMs = 20);
 
             /// \brief
             /// Function that handles the complete communication between the pn532 and host controller
@@ -188,21 +199,9 @@ namespace NFC_Controller
             /// It waits again till the chip is ready to to send data to the host controller
             /// @param command      Command that needs to be send
             /// @return statusCode  Status of the operation
-            Result get_response(uint8_t onCommand);
+            statusCode sendAndAcknowlegdeCommand(setupSendCommand &command);
 
-            /// \brief
-            /// Function that handles the complete communication between the pn532 and host controller
-            /// \details
-            /// This function will send a command to the pn532
-            /// It waits till the chip responds
-            /// It checks if the pn532 has send an ACKnowlege frame
-            /// It waits again till the chip is ready to to send data to the host controller
-            /// @param command      Command that needs to be send
-            /// @return statusCode  Status of the operation
-            statusCode sendAndAcknowlegdeCommand(setupSendCommand& command);
-
-
-            // ------------------------------------------------------------------------------- //   
+            // ------------------------------------------------------------------------------- //
             // More advanced functions                                                         //
             // ------------------------------------------------------------------------------- //
 
@@ -210,7 +209,7 @@ namespace NFC_Controller
             /// This funciton gets the firmware version of the pn532
             /// \details
             /// Will return an array with the firmware version
-            /// Source : https://www.nxp.com/docs/en/user-guide/141520.pdf 
+            /// Source : https://www.nxp.com/docs/en/user-guide/141520.pdf
             /// P. 73    section 7.2.2
             /// @return std::array[0] Statuscode
             /// @return std::array[1] pn5xx version
@@ -223,13 +222,13 @@ namespace NFC_Controller
             /// This funcition lets the pn532 perform a selftest
             /// \details
             /// The communication line test is performed to test the data link between host controller and pn532
-            /// Source : https://www.nxp.com/docs/en/user-guide/141520.pdf 
-            /// P. 69    section 7.2.1  
+            /// Source : https://www.nxp.com/docs/en/user-guide/141520.pdf
+            /// P. 69    section 7.2.1
             /// @return statusCode  status of the operation
             statusCode performSelftest() override;
 
             /// \brief
-            /// This function allows the host controller to know the complete situation of the pn532 at a given moment 
+            /// This function allows the host controller to know the complete situation of the pn532 at a given moment
             /// \details
             /// @return std::array[0] Statuscode
             /// @return std::array[1] Last error
@@ -248,12 +247,11 @@ namespace NFC_Controller
             /// @param  cardtype    Type of card that needs to be read
             /// @return false       No card has been detected
             /// @return true        A card has been detected
-            bool detectCard(card& cardinfo, const uint8_t nCards, const uint8_t cardtype, Ringbuffer<uint8_t, 64>* response) override;
+            bool detectCard(card &cardinfo, const uint8_t nCards, const uint8_t cardtype, Ringbuffer<uint8_t, 64> *response) override;
 
+            bool detectCard(card &cardinfo, Ringbuffer<uint8_t, 64> *response) override;
 
-            bool detectCard(card& cardinfo, Ringbuffer<uint8_t, 64>* response) override;
-
-            /// \brief 
+            /// \brief
             /// Metod so the pn532 can select a specific card if multiple cards are present within the RF field
             /// \details
             /// @note   This function is not yet implemented, hence it will return a statusOK
@@ -270,7 +268,7 @@ namespace NFC_Controller
             ///     Wired card:     The Host controller can access the SAM with standard PCD commands
             ///     Dual card:      The pn532 and SAM are configured as two seperated targets
             ///
-            /// Source:  https://www.nxp.com/docs/en/user-guide/141520.pdf 
+            /// Source:  https://www.nxp.com/docs/en/user-guide/141520.pdf
             /// P. 89    section 7.2.10
             ///
             /// @param  mode        The mode we want to initialise the pn532 in
@@ -280,18 +278,18 @@ namespace NFC_Controller
             /// \brief
             /// This funcion is used to switch pn532's RF field on or off
             /// \details
-            /// Source:  https://www.nxp.com/docs/en/user-guide/141520.pdf 
+            /// Source:  https://www.nxp.com/docs/en/user-guide/141520.pdf
             /// P. 101   section 7.3.1
             /// @param  state       Wether the rf field needs to be on (1) of off (0)
             /// @return statusCode  Status of the operation
             statusCode RFField(const bool state) override;
 
             /// \brief
-            /// This function sets the max number of times the pn532 will try to activate a target in InListPassiveTarget command 
+            /// This function sets the max number of times the pn532 will try to activate a target in InListPassiveTarget command
             /// \details
             /// value 0x00 means only try once
             /// value 0xFF means try infinitely (default)
-            /// Source:  https://www.nxp.com/docs/en/user-guide/141520.pdf 
+            /// Source:  https://www.nxp.com/docs/en/user-guide/141520.pdf
             /// P. 103   section 7.3.1
             /// @param  maxRetries  Number of times the pn532 will try to activate a target
             /// @return statusCode  Status of the operation
@@ -312,7 +310,7 @@ namespace NFC_Controller
             /// @param  receiveBuffer    Pointer to the buffer to store the received data
             /// @param  receiveBufferSize Size of the receive buffer
             /// @return statusCode      Status of the operation
-            statusCode initDataExchange(const uint8_t sendBuffer[], const uint8_t sendBufferSize, uint8_t receiveBuffer[], uint8_t& receiveBufferSize) override;
+            statusCode initDataExchange(const uint8_t sendBuffer[], const uint8_t sendBufferSize, uint8_t receiveBuffer[], uint8_t &receiveBufferSize) override;
 
             /// \brief
             /// This function gets the version of the pn532 chip
@@ -334,7 +332,7 @@ namespace NFC_Controller
             /// @param  AorB        Wether the sector trailer blocks need to be authenticated with key A or key B
             /// @param  cardKeys    Struct to the sector trailer keys of the card
             /// @return statusCode  Status of the operation
-            statusCode mifareReadCard(card& cardInfo, const uint8_t cardNumber, const mifareCommands AorB, const cardKeys& authenticationKeys) override;
+            statusCode mifareReadCard(card &cardInfo, const uint8_t cardNumber, const mifareCommands AorB, const cardKeys &authenticationKeys) override;
 
             /// \brief
             /// Method for the pn532 to read a certain mifare classic page
@@ -343,7 +341,7 @@ namespace NFC_Controller
             /// @param  cardNumber  Card that needs to be read from
             /// @param  pageNumber  Pagenumber that needs to be read
             /// @return statusCode  Status of the operation
-            statusCode mifareReadPage(card& cardinfo, const uint8_t cardNumber, const uint8_t pageNumber) override;
+            statusCode mifareReadPage(card &cardinfo, const uint8_t cardNumber, const uint8_t pageNumber) override;
 
             /// \brief
             /// Method for the pn532 to write to a certain page of a mifare classic card
@@ -353,7 +351,7 @@ namespace NFC_Controller
             /// @param  pageNumber  Pagenumber that needs to be written to
             /// @param  data        Pointer to data array that needs to be written to the card
             /// @return statusCode  Status of the operation
-            statusCode mifareWritePage(card& cardinfo, const uint8_t cardNumber, const uint8_t pageNumber, const uint8_t* data) override;
+            statusCode mifareWritePage(card &cardinfo, const uint8_t cardNumber, const uint8_t pageNumber, const uint8_t *data) override;
 
             /// \brief
             /// Method for the pn532 to authenticate a certain sector trailer block of a mifare classic card
@@ -364,7 +362,7 @@ namespace NFC_Controller
             /// @param  pageNumber  Pagenumber that needs to be authenticated
             /// @param  key         Pointer to key array that the sector trailer block needs to be autenticated with
             /// @return statusCode  Status of the operation
-            statusCode mifareAuthenticate(card& cardinfo, const uint8_t cardNumber, const mifareCommands AorB, const uint8_t pagenr, const uint8_t* key) override;
+            statusCode mifareAuthenticate(card &cardinfo, const uint8_t cardNumber, const mifareCommands AorB, const uint8_t pagenr, const uint8_t *key) override;
 
             /// \brief
             /// This function will transform a given page ( pagenr ) to a valueblock.
@@ -377,15 +375,15 @@ namespace NFC_Controller
             /// @param  sector      Sector where the new valueblock will be located in
             /// @param  key         Pointer to key array that the sector trailer block needs to be autenticated with
             /// @return statusCode  Status of the operation
-            statusCode mifareMakeValueBlock(card& cardinfo, const uint8_t cardnumber, const mifareCommands AorB, const uint8_t pagenr, const uint8_t sector, const uint8_t* key) override;
+            statusCode mifareMakeValueBlock(card &cardinfo, const uint8_t cardnumber, const mifareCommands AorB, const uint8_t pagenr, const uint8_t sector, const uint8_t *key) override;
 
             /// \brief
-            /// This function will increment a valueblock by a given value ( value ) 
+            /// This function will increment a valueblock by a given value ( value )
             /// \details
             /// @note   When this function is called, the valueblock will not be modified
-            ///         only the internal temporary buffer will be updated. In order to 
+            ///         only the internal temporary buffer will be updated. In order to
             ///         update the actual valueblock the transfer function needs to be
-            ///         called after this function. source source: http://www.cs.ru.nl/~wouter/papers/2008-thebest-updated.pdf 
+            ///         called after this function. source source: http://www.cs.ru.nl/~wouter/papers/2008-thebest-updated.pdf
             ///         p. 7    2.2 using value blocks
             ///
             /// @param  cardinfo    A card class where the card data can be stored in
@@ -396,15 +394,15 @@ namespace NFC_Controller
             /// @param  key         Pointer to key array that the sector trailer block needs to be autenticated with
             /// @param  value       Value the sectorblock needs to be incremented by
             /// @return statusCode  Status of the operation
-            statusCode mifareIncrement(card& cardinfo, const uint8_t cardnumber, const mifareCommands AorB, const uint8_t pagenr, const uint8_t sector, const uint8_t* key, const uint32_t value) override;
+            statusCode mifareIncrement(card &cardinfo, const uint8_t cardnumber, const mifareCommands AorB, const uint8_t pagenr, const uint8_t sector, const uint8_t *key, const uint32_t value) override;
 
             /// \brief
-            /// This function will decrement a valueblock by a given value ( value ) 
+            /// This function will decrement a valueblock by a given value ( value )
             /// \details
             /// @note   When this function is called, the valueblock will not be modified.
-            ///         Only the internal temporary buffer will be updated. In order to 
+            ///         Only the internal temporary buffer will be updated. In order to
             ///         update the actual valueblock the transfer function needs to be
-            ///         called after this function. source: http://www.cs.ru.nl/~wouter/papers/2008-thebest-updated.pdf 
+            ///         called after this function. source: http://www.cs.ru.nl/~wouter/papers/2008-thebest-updated.pdf
             ///         p. 7    2.2 using value blocks
             ///
             /// @param  cardinfo    A card class where the card data can be stored in
@@ -415,7 +413,7 @@ namespace NFC_Controller
             /// @param  key         Pointer to key array that the sector trailer block needs to be autenticated with
             /// @param  value       Value the sectorblock needs to be decremented by
             /// @return statusCode  Status of the operation
-            statusCode mifareDecrement(card& cardinfo, const uint8_t cardnumber, const mifareCommands AorB, const uint8_t pagenr, const uint8_t sector, const uint8_t* key, const uint32_t value) override;
+            statusCode mifareDecrement(card &cardinfo, const uint8_t cardnumber, const mifareCommands AorB, const uint8_t pagenr, const uint8_t sector, const uint8_t *key, const uint32_t value) override;
 
             /// \brief
             /// This function will update a valueblock with the value that is in the internal buffer of the mifare card
@@ -427,7 +425,10 @@ namespace NFC_Controller
             /// @param sector       Sector where the new valueblock will be located in
             /// @param key          Pointer to key array that the sector trailer block needs to be autenticated with
             /// @return statusCode  Status of the operation
-            statusCode mifareTransfer(card& cardinfo, const uint8_t cardnumber, const mifareCommands AorB, const uint8_t pagenr, const uint8_t sector, const uint8_t* key) override;
+            statusCode mifareTransfer(card &cardinfo, const uint8_t cardnumber, const mifareCommands AorB, const uint8_t pagenr, const uint8_t sector, const uint8_t *key) override;
+
+        private:
+            setupSendCommand buildFrame(const CommandRequest &request);
         }; // Class PN532_Chip
     } // namespace Cpp
 } // namespace NFC_Controller

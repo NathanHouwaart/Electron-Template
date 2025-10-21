@@ -1,4 +1,3 @@
-// ...existing code...
 import { createRequire } from 'module';
 import path from 'path';
 import fs from 'fs';
@@ -53,4 +52,3 @@ export const MyObject: {
 export const PN532_Wrapper: {
     new(): PN532_Wrapper;
 } = addon.PN532_Wrapper;
-// ...existing code...

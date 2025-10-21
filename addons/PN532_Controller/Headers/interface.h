@@ -52,6 +52,13 @@ namespace communication {
        /// \details
        /// @param      baidrate   new baudrate of the protocol
         virtual bool set_baudrate(uint32_t baudrate) = 0;
+
+        /// \brief
+        /// Abstract function to check if data is available to read
+        /// \details
+        /// @return true     Data is available to read
+        /// @return false    No data is available to read
+        virtual bool data_available() const = 0;
     };
 
 }

@@ -151,5 +151,19 @@ namespace NFC_Controller
 			}
 			return 1;
 		}
+
+		bool SerialCommunication::data_available() const
+		{
+			DWORD errors;
+			COMSTAT status;
+
+			if (ClearCommError(serial_handler, &errors, &status) == 0)
+			{
+				std::cerr << "ClearCommError failed." << std::endl;
+				return false;
+			}
+
+			return status.cbInQue > 0;
+		}
 	} // namespace Cpp
 } // namespace NFC_Controller

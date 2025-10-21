@@ -81,6 +81,13 @@ namespace NFC_Controller
              */
             bool set_baudrate(uint32_t baudrate);
 
+            /**
+             * @brief function to check if data is available to read
+             * @return true Data is available to read
+             * @return false No data is available to read
+             */
+            bool data_available() const override;
+
         private:
             bool            is_open = false;
             HANDLE          serial_handler = { 0 };

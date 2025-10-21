@@ -3,7 +3,7 @@ cmake_policy(SET CMP0091 NEW)
 cmake_policy(SET CMP0042 NEW)
 
 project(deviceaddon VERSION 1.0.0 LANGUAGES C CXX)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 include_directories(${CMAKE_JS_INC})
 include_directories(${CMAKE_SOURCE_DIR}/node_modules/node-addon-api)

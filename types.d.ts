@@ -22,11 +22,13 @@ type IPCHandlers = {
 
 // 2) helpers derived from IPCHandlers
 type EventInvokeArgs = { [K in keyof IPCHandlers]: Parameters<IPCHandlers[K]> };
-type EventPayloadMapping = { [K in keyof IPCHandlers]: Awaited<ReturnType<IPCHandlers[K]>> };
+type EventPayloadMapping = { [K in keyof IPCHandlers]: Awaited<ReturnType<IPCHandlers[K]>> } & RendererEvents;
 
 // 3) derive the exact shape to expose on window.electron
 type ExposedElectronAPI = {
   [K in keyof IPCHandlers]: (...args: EventInvokeArgs[K]) => ReturnType<IPCHandlers[K]>;
+} & {
+  onSelfTestProgress: (callback: (payload: SelfTestUpdate) => void) => () => void;
 };
 
 // 4) augment global Window so you only maintain IPCHandlers

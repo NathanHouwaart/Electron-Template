@@ -31,6 +31,9 @@
 
 #include "declarations.h"
 #include <stdint.h>
+#include <iostream>
+#include <iomanip>
+#include "hex.h"
 
 namespace NFC_Controller
 {
@@ -117,6 +120,17 @@ namespace NFC_Controller
             pn532Response() :length(0), status(statusCode::UnknownError) {};
 
             pn532Response(const uint8_t* receiveBufferP, uint8_t bufferSize, uint8_t expectedCommandCode);
+
+            void printInfo() const {
+                std::cout << "PN532 Response Info:" << std::endl;
+                std::cout << "Status: " << static_cast<int>(status) << std::endl;
+                std::cout << "Length: " << static_cast<int>(length) << std::endl;
+                std::cout << "Final Buffer: ";
+                for (uint8_t i = 0; i < length; i++) {
+                    std::cout << Hex0x(finalBuffer[i]) << " ";
+                }
+                std::cout << std::dec << std::endl;
+            }
 
         private:
             uint8_t calculateChecksum(const uint8_t* buffer, int index, uint8_t n);
