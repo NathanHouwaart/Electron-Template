@@ -20,9 +20,9 @@ public:
     using MifareDesfireEV2Card::MifareDesfireEV2Card;
 
     // EV3-specific improvements
-    virtual bool enableTransactionMACChaining(bool enable = true) = 0;
-    virtual bool getTransactionMACCounter(uint32_t& counter) = 0;
-    virtual bool authenticateEV3(uint8_t keyNo, const std::vector<uint8_t>& key) = 0;
+    virtual bool enableTransactionMACChaining(bool enable = true) { return false; }
+    virtual bool getTransactionMACCounter(uint32_t& counter) { return false; }
+    virtual bool authenticateEV3(uint8_t keyNo, const std::vector<uint8_t>& key) { return false; }
 
     std::string prettyType() const override { return "MIFARE DESFire EV3"; }
 };

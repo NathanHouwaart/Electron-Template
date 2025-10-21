@@ -675,16 +675,37 @@ namespace NFC_Controller
             // Check for MIFARE Classic (SAK = 0x08, 0x09, or 0x18)
             if (sak == 0x08 || sak == 0x09 || sak == 0x18) {
                 Log("Detected MIFARE Classic card (SAK: 0x" + std::to_string(sak) + ")\n");
+                Log("Creating MifareClassicCard\n");
                 return MifareClassicCard{targetInfo};
             }
             
             // Check for DESFire or ISO-DEP compliant cards (SAK bit 5 set = 0x20)
             if ((sak & 0x20) != 0) {
-                Log("Detected MIFARE DESFire card (SAK: 0x" + std::to_string(sak) + ")\n");
+                Log("Detected ISO-DEP card (SAK: 0x" + std::to_string(sak) + "), querying DESFire version...\n");
                 
-                // Could potentially differentiate between EV1/EV2/EV3 based on ATS
-                // For now, return base DESFire card
-                return MifareDesfireCard{targetInfo};
+                // Create a temporary DESFire card with NFC reference to query version
+                MifareDesfireCard tempCard{targetInfo, this};
+                
+                // Query the card to determine specific variant (EV1/EV2/EV3)
+                uint8_t variant = tempCard.getDesfireVariant();
+                
+                switch (variant) {
+                    case 1: // DESFire EV1
+                        Log("Creating MifareDesfireEV1Card\n");
+                        return MifareDesfireEV1Card{targetInfo, this};
+                    
+                    case 2: // DESFire EV2
+                        Log("Creating MifareDesfireEV2Card\n");
+                        return MifareDesfireEV2Card{targetInfo, this};
+                    
+                    case 3: // DESFire EV3
+                        Log("Creating MifareDesfireEV3Card\n");
+                        return MifareDesfireEV3Card{targetInfo, this};
+                    
+                    default: // Unknown or base DESFire
+                        Log("Unknown DESFire variant, returning base MifareDesfireCard\n");
+                        return tempCard;
+                }
             }
             
             // Unknown card type

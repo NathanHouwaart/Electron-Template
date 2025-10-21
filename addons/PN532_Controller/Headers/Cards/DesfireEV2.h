@@ -20,13 +20,13 @@ public:
     using MifareDesfireEV1Card::MifareDesfireEV1Card;
 
     // EV2 new features
-    virtual bool authenticateEV2(uint8_t keyNo, const std::vector<uint8_t>& key) = 0;
-    virtual bool createBackupFile(uint8_t fileNo, uint16_t size) = 0;
-    virtual bool getKeyVersion(uint8_t keyNo, uint8_t& version) = 0;
+    virtual bool authenticateEV2(uint8_t keyNo, const std::vector<uint8_t>& key) { return false; }
+    virtual bool createBackupFile(uint8_t fileNo, uint16_t size) { return false; }
+    virtual bool getKeyVersion(uint8_t keyNo, uint8_t& version) const { return false; }
 
     // Transaction MAC (integrity)
-    virtual bool enableTransactionMAC(bool enable = true) = 0;
-    virtual bool setVirtualCardID(const std::vector<uint8_t>& vcid) = 0;
+    virtual bool enableTransactionMAC(bool enable = true) { return false; }
+    virtual bool setVirtualCardID(const std::vector<uint8_t>& vcid) { return false; }
 
     std::string prettyType() const override { return "MIFARE DESFire EV2"; }
 };
