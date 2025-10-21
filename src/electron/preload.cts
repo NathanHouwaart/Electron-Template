@@ -32,6 +32,11 @@ electron.contextBridge.exposeInMainWorld("electron", {
         electron.ipcRenderer.on('device-disconnected', cb);
         return () => electron.ipcRenderer.off('device-disconnected', cb);
     },
+    onDeviceConnected: (callback: (payload: { port: string }) => void) => {
+        const cb = (_: any, payload: { port: string }) => callback(payload);
+        electron.ipcRenderer.on('device-connected', cb);
+        return () => electron.ipcRenderer.off('device-connected', cb);
+    },
 } satisfies Window["electron"]);
 
 

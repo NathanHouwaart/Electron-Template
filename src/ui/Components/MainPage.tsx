@@ -28,9 +28,19 @@ export const ModernSidebar = () => {
     const unsub = window.electron.onDeviceDisconnected(() => {
       setConnectionStatus('disconnected');
       setFirmware('');
-      setSelectedPort('');
       // Refresh ports list
       window.electron.listComPorts().then((p) => setPorts(p));
+    });
+    return () => unsub();
+  }, []);
+
+  // Listen for device connected events and update UI
+  useEffect(() => {
+    const unsub = window.electron.onDeviceConnected((payload) => {
+      setConnectionStatus('connected');
+      if (payload?.port) setSelectedPort(payload.port);
+      // fetch firmware when connected
+      handleGetFirmware();
     });
     return () => unsub();
   }, []);
@@ -38,50 +48,32 @@ export const ModernSidebar = () => {
   const handleConnect = async () => {
     if (connectionStatus !== 'disconnected') return;
     if (!selectedPort) return;
-
-    window.electron.connect(selectedPort).then(
-      (result) => {
-        console.log("Result of connect:", result);
-        if (result) {
-          setConnectionStatus('connected');
-          handleGetFirmware();
-        } else {
-          setConnectionStatus('Error connecting');
-          setTimeout(() => {
-            setConnectionStatus('disconnected');
-          }, 2000);
-        }
-      }
-    ).catch(
-      (error) => {
-        console.error("Error during connect:", error);
-        setConnectionStatus('Error connecting');
-        setTimeout(() => {
-          setConnectionStatus('disconnected');
-        }, 2000);
-      }
-    );
+    // initiate connect and show transient state; final state will be applied
+    // when main process emits 'device-connected' (or on error we handle locally)
     setConnectionStatus('connecting');
+    window.electron.connect(selectedPort).then((result) => {
+      console.log("Result of connect:", result);
+      if (!result) {
+        setConnectionStatus('Error connecting');
+        setTimeout(() => setConnectionStatus('disconnected'), 2000);
+      }
+    }).catch((error) => {
+      console.error("Error during connect:", error);
+      setConnectionStatus('Error connecting');
+      setTimeout(() => setConnectionStatus('disconnected'), 2000);
+    });
   };
 
   const handleDisconnect = async () => {
     if (connectionStatus !== 'connected') return;
 
-    window.electron.disconnect().then(
-      (result) => {
-        console.log("Result of disconnect:", result);
-        if (!result) {
-          setConnectionStatus('Error disconnecting');
-          setTimeout(() => {
-            setConnectionStatus('connected');
-          }, 2000);
-        } else {
-          setConnectionStatus('disconnected');
-          setFirmware('');
-        }
-      }
-    );
-    setConnectionStatus('disconnecting');
+    // Only initiate disconnect; let the main process broadcast the final state
+    // (device-disconnected) so all UI components update consistently.
+    try {
+      await window.electron.disconnect();
+    } catch (err) {
+      console.error('Disconnect invoke failed:', err);
+    }
   };
 
   const handleGetFirmware = () => {

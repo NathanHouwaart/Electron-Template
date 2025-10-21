@@ -43,6 +43,7 @@ type ExposedElectronAPI = {
     completeCallback: (error: Error | null, result: boolean) => void
   ) => void;
   onDeviceDisconnected: (callback: () => void) => () => void;
+  onDeviceConnected: (callback: (payload: { port: string }) => void) => () => void;
 };
 
 // 4) augment global Window so you only maintain IPCHandlers

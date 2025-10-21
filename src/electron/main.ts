@@ -48,7 +48,11 @@ ipcMain.handle('connect', async (event: IpcMainInvokeEvent, port: string) => {
   console.log('ipcMain: connect called with args:', port);
 
   const obj = new PN532_Wrapper();
-  return obj.connect(port);
+  const res = await obj.connect(port);
+  if (res && mainWindow) {
+    mainWindow.webContents.send('device-connected', { port });
+  }
+  return res;
 });
 
 ipcMain.handle('disconnect', async () => {
