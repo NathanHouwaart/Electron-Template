@@ -143,22 +143,18 @@ namespace NFC_Controller::Cpp
 
         // Parse ATS (Answer To Select) - optional for ISO-DEP cards
         void parseATS(const pn532Response& frame, size_t& index, TargetInfo& targetInfo) const {
-            if (index >= frame.length) {
-                return; // No ATS present
+            // Only parse ATS if card supports ISO-DEP (SAK bit 5 set) and data is available
+            if (index >= frame.length || (targetInfo.sak & 0x20) == 0) {
+                return;
             }
 
-            // ATS is only present if the SAK indicates ISO-DEP support (bit 5 set: 0x20)
-            // If SAK doesn't indicate ISO-DEP, skip ATS parsing to avoid consuming
-            // bytes that belong to the next target (in multi-target scenarios)
-            if ((targetInfo.sak & 0x20) == 0) {
-                return; // No ATS expected for non-ISO-DEP cards
-            }
-
+            // ATS length byte (TL) includes itself in the count per ISO 14443-4
             uint8_t atsLength = frame.finalBuffer[index++];
-            if (atsLength > 0 && index + atsLength <= frame.length) {
-                targetInfo.ats.assign(frame.finalBuffer + index,
-                                     frame.finalBuffer + index + atsLength);
-                index += atsLength;
+            uint8_t dataBytes = (atsLength > 0) ? (atsLength - 1) : 0;
+            
+            if (dataBytes > 0 && index + dataBytes <= frame.length) {
+                targetInfo.ats.assign(frame.finalBuffer + index, frame.finalBuffer + index + dataBytes);
+                index += dataBytes;
             }
         }
 
