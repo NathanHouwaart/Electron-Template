@@ -69,6 +69,7 @@ namespace NFC_Controller::Cpp
         // Parse a single target from the response frame
         bool parseTarget(const pn532Response& frame, size_t& index, CommandResult& result) const {
             if (index >= frame.length) {
+                Log("Index out of bounds while parsing target.\n");
                 result.status = pn532Response::statusCode::InvalidLength;
                 return false;
             }
@@ -94,6 +95,7 @@ namespace NFC_Controller::Cpp
                              TargetInfo& targetInfo, CommandResult& result) const {
             // Format: [ATQA(2)][SAK(1)][UIDLen(1)][UID...][ATSLen(1)][ATS...]
             if (index + 4 > frame.length) {
+                Log("Index out of bounds while parseTypeATarget target.\n");
                 result.status = pn532Response::statusCode::InvalidLength;
                 return false;
             }
@@ -120,6 +122,7 @@ namespace NFC_Controller::Cpp
         bool parseUID(const pn532Response& frame, size_t& index, 
                      TargetInfo& targetInfo, CommandResult& result) const {
             if (index >= frame.length) {
+                Log("Index out of bounds while parseTypeATarget target.\n");
                 result.status = pn532Response::statusCode::InvalidLength;
                 return false;
             }
@@ -127,6 +130,7 @@ namespace NFC_Controller::Cpp
             uint8_t uidLength = frame.finalBuffer[index++];
             
             if (index + uidLength > frame.length) {
+                Log("Index out of bounds while parsing UID.\n");
                 result.status = pn532Response::statusCode::InvalidLength;
                 return false;
             }
@@ -141,6 +145,13 @@ namespace NFC_Controller::Cpp
         void parseATS(const pn532Response& frame, size_t& index, TargetInfo& targetInfo) const {
             if (index >= frame.length) {
                 return; // No ATS present
+            }
+
+            // ATS is only present if the SAK indicates ISO-DEP support (bit 5 set: 0x20)
+            // If SAK doesn't indicate ISO-DEP, skip ATS parsing to avoid consuming
+            // bytes that belong to the next target (in multi-target scenarios)
+            if ((targetInfo.sak & 0x20) == 0) {
+                return; // No ATS expected for non-ISO-DEP cards
             }
 
             uint8_t atsLength = frame.finalBuffer[index++];
