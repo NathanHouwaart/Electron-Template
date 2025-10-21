@@ -11,6 +11,7 @@
 #include "AddonLog.h"
 #include "PN532_Controller/Headers/Commands/getFirmwareVersion.h"
 #include "PN532_Controller/Headers/Commands/performSelfTestCommand.h"
+#include "PN532_Controller/Headers/Commands/inListPassiveTarget.h"
 
 using namespace Napi;
 
@@ -216,64 +217,10 @@ Napi::Value PN532_Wrapper::GetVersion(const Napi::CallbackInfo &info)
 {
     Napi::Env env = info.Env();
 
-    auto cardInfo = NFC_Controller::Cpp::card();
-    uint8_t cardType = NFC_Controller::Cpp::pn532::command::CardType::TypeA_ISO_IEC14443; // Cardtype we want to detect
-    uint8_t cardNumber = 0x01;
-    Ringbuffer<uint8_t, 64> response;
+    using TargetType = NFC_Controller::Cpp::TargetType;
 
-    auto command = NFC_Controller::Cpp::GetFirmwareVersionCommand();
-    auto res = m_nfc_chip->executeCommand(command);
-
-    command.firmware().printInfo();
-
-    Log("Performing self-test...");
-    using PerformSelfTestCommand = NFC_Controller::Cpp::PerformSelfTestCommand;
-    using Options = PerformSelfTestCommand::Options;
-
-    {
-        auto romSelfTestCommand = PerformSelfTestCommand(
-            Options{
-                .test = NFC_Controller::Cpp::PerformSelfTestCommand::Test::RomChecksum});
-        auto selfTestResult = m_nfc_chip->executeCommand(romSelfTestCommand);
-        Log("ROM Self-test result: " + std::to_string(int(selfTestResult.status)));
-    }
-    {
-        auto ramSelfTestCommand = PerformSelfTestCommand(
-            Options{
-                .test = NFC_Controller::Cpp::PerformSelfTestCommand::Test::RamIntegrity});
-        auto selfTestResult = m_nfc_chip->executeCommand(ramSelfTestCommand);
-        Log("RAM Self-test result: " + std::to_string(int(selfTestResult.status)));
-    }
-    {
-        auto communicationLineTestCommand = PerformSelfTestCommand(
-            Options{
-                .test = NFC_Controller::Cpp::PerformSelfTestCommand::Test::CommunicationLine,
-                .parameters = {0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA}});
-        auto selfTestResult = m_nfc_chip->executeCommand(communicationLineTestCommand);
-        Log("Communication Line Self-test result: " + std::to_string(int(selfTestResult.status)));
-    }
-    {
-        auto echoBackTestCommand = PerformSelfTestCommand(
-            Options{
-                .test = NFC_Controller::Cpp::PerformSelfTestCommand::Test::EchoBack,
-                .parameters = {0xBA, 0xAD, 0xF0, 0x0D, 0x12, 0x34, 0x56, 0x78}});
-        auto selfTestResult = m_nfc_chip->executeCommand(echoBackTestCommand);
-        Log("Echo Back Self-test result: " + std::to_string(int(selfTestResult.status)));
-    }
-    {
-        auto selfAntennaTestCommand = PerformSelfTestCommand(
-            Options{
-                .test = NFC_Controller::Cpp::PerformSelfTestCommand::Test::AntennaContinuity,
-                .parameters = {
-                    PerformSelfTestCommand::makeAntennaThreshold(
-                        /*highThresholdCode=*/static_cast<uint8_t>(1u << 1),
-                        /*lowThresholdCode=*/static_cast<uint8_t>(1u << 0),
-                        /*useUpperComparator=*/true,
-                        /*useLowerComparator=*/true)}});
-        Log("Performing Antenna Continuity Self-test...");
-        auto selfTestResult = m_nfc_chip->executeCommand(selfAntennaTestCommand);
-        Log("Antenna Continuity Self-test result: " + std::to_string(int(selfTestResult.status)));
-    }
+    auto detectedCard = m_nfc_chip->detectCard(TargetType::TypeA_106kbps);
+    
 
     // if(!m_nfc_chip->detectCard(cardInfo, cardNumber, cardType, &response)){
     //     Napi::Error::New(env, "No card detected")

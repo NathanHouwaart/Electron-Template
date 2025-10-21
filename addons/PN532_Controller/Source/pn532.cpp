@@ -19,6 +19,8 @@
 #include <chrono>
 #include <thread>
 
+#include "../Headers/Commands/inListPassiveTarget.h"
+
 namespace NFC_Controller
 {
     namespace Cpp
@@ -510,110 +512,6 @@ namespace NFC_Controller
             return status;
         }
 
-        // bool PN532_chip::detectCard(card &cardinfo, const uint8_t nCards, const uint8_t cardtype, Ringbuffer<uint8_t, 64> *response_p)
-        // {
-        //     uint8_t commands[] = {
-        //         pn532::command::InListPassiveTarget,
-        //         nCards,
-        //         cardtype
-        //     };
-
-        //     Log("Detecting card...\n");
-
-        //     auto command = setupSendCommand(commands, sizeof(commands) / sizeof(uint8_t));
-
-        //     Log("Sending InListPassiveTarget command to NFC chip...");
-        //     for(uint8_t i = 0; i < command.length; i++){
-        //         std::cout << "0x" << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(command.finalBuffer[i]) << " ";
-        //     }std::cout << std::endl;
-
-        //     auto result = sendAndAcknowlegdeCommand(command);
-        //     if (result != statusCode::pn532StatusOK)
-        //     {
-        //         return false;
-        //     }
-
-        //     auto [status, response] = get_response(commands[0]);
-        //     if (status != statusCode::pn532StatusOK)
-        //     {
-        //         return false;
-        //     }
-
-        //     std::cout << "InListPassiveTarget response data: ";
-        //     for (uint8_t i = 0; i < response.length; i++)
-        //     {
-        //         std::cout << Hex0x(response.finalBuffer[i]) << " ";
-        //     }
-        //     std::cout << std::endl;
-
-        //     // response.finalBuffer now contains the parsed payload (no preamble/framing)
-        //     // For InListPassiveTarget, the response format is:
-        //     // [NbTg] [Tg] [SENS_RES(2)] [SEL_RES] [NFCIDLength] [NFCID] ...
-        //     // Where NbTg = number of targets found
-
-        //     if (response.length < 1)
-        //     {
-        //         std::cout << "Response too short" << std::endl;
-        //         return false;
-        //     }
-
-        //     uint8_t numTargets = response.finalBuffer[0];
-        //     std::cout << "Number of targets found: " << int(numTargets) << std::endl;
-
-        //     if (numTargets == 0)
-        //     {
-        //         std::cout << "No card detected" << std::endl;
-        //         return false;
-        //     }
-
-        //     // Check we have enough data for UID extraction
-        //     // Minimal response: [NbTg][Tg][SENS_RES(2)][SEL_RES][NFCIDLen][NFCID...]
-        //     if (response.length < 7)
-        //     {
-        //         std::cout << "Response data too short for UID extraction" << std::endl;
-        //         return false;
-        //     }
-
-        //     // Extract UID (assuming ISO14443A Type A card, 4-byte UID)
-        //     // response.finalBuffer layout:
-        //     // [0] = NbTg (1)
-        //     // [1] = Tg (target number, usually 1)
-        //     // [2-3] = SENS_RES
-        //     // [4] = SEL_RES
-        //     // [5] = NFCID Length
-        //     // [6...] = NFCID (UID)
-
-        //     uint8_t uidLength = response.finalBuffer[5];
-        //     std::cout << "UID length: " << int(uidLength) << std::endl;
-
-        //     if (uidLength == 4 && response.length >= 10)
-        //     {
-        //         // 4-byte UID
-        //         cardinfo.setUID(response.finalBuffer[6], response.finalBuffer[7],
-        //                        response.finalBuffer[8], response.finalBuffer[9]);
-        //         std::cout << "Card detected with UID: "
-        //                  << Hex0x(response.finalBuffer[6]) << " "
-        //                  << Hex0x(response.finalBuffer[7]) << " "
-        //                  << Hex0x(response.finalBuffer[8]) << " "
-        //                  << Hex0x(response.finalBuffer[9]) << std::endl;
-        //         return true;
-        //     }
-        //     else if (uidLength == 7 && response.length >= 13)
-        //     {
-        //         // 7-byte UID (for some cards)
-        //         std::cout << "7-byte UID detected (not yet fully supported)" << std::endl;
-        //         // For now, take first 4 bytes
-        //         cardinfo.setUID(response.finalBuffer[6], response.finalBuffer[7],
-        //                        response.finalBuffer[8], response.finalBuffer[9]);
-        //         return true;
-        //     }
-        //     else
-        //     {
-        //         std::cout << "Unexpected UID length or insufficient data" << std::endl;
-        //         return false;
-        //     }
-        // }
-
         bool PN532_chip::detectCard(card &cardinfo, const uint8_t nCards, const uint8_t cardtype, Ringbuffer<uint8_t, 64> *response_p)
         {
             uint8_t commands[] = {
@@ -759,6 +657,44 @@ namespace NFC_Controller
 
             std::cout << ".";
             return false;
+        }
+
+        CardVariant PN532_chip::detectCard(TargetType targetType)
+        {
+            Log("Detecting card...\n");
+
+            using Options = InListPassiveTargetCommand::Options;
+
+            auto inListPassiveTargetCommand = InListPassiveTargetCommand(
+                Options{
+                    .maxTargets = 2,
+                    .target = targetType});
+            auto result = this->executeCommand(inListPassiveTargetCommand);
+            Log("inListPassiveTargetCommand result: " + std::to_string(int(result.status)));
+            
+            if (result.status != pn532Response::statusCode::OK)
+            {
+                Log("inListPassiveTargetCommand failed with status: " + std::to_string(int(result.status)) + "\n");
+                return std::monostate{};
+            }
+
+            Log("Number of detected targets: " + std::to_string(inListPassiveTargetCommand.getDetectedTargets().size()) + "\n");
+
+            if (inListPassiveTargetCommand.getDetectedTargets().empty())
+            {
+                Log("No card detected.\n");
+                return std::monostate{};
+            }
+
+            auto cardinfo = inListPassiveTargetCommand.getDetectedTargets();
+            for(const auto &c : cardinfo) {
+                Log("Detected card UID: ");
+                for (auto byte : c.uid) {
+                    std::cout << Hex0x(byte) << " ";
+                }
+                std::cout << std::endl;
+            }
+            return MifareDesfireCard{cardinfo[0]};
         }
 
         statusCode PN532_chip::setSerialBaudrate(const baudRate br)

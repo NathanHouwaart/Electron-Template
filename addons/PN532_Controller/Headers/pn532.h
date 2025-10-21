@@ -33,6 +33,7 @@
 #include "nfc.h"
 #include "pn532Command.h"
 #include "command.h"
+#include "cardVariant.h"
 
 namespace NFC_Controller
 {
@@ -250,6 +251,8 @@ namespace NFC_Controller
             bool detectCard(card &cardinfo, const uint8_t nCards, const uint8_t cardtype, Ringbuffer<uint8_t, 64> *response) override;
 
             bool detectCard(card &cardinfo, Ringbuffer<uint8_t, 64> *response) override;
+
+            CardVariant detectCard(TargetType targetType);
 
             /// \brief
             /// Metod so the pn532 can select a specific card if multiple cards are present within the RF field
