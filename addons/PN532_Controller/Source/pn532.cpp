@@ -659,6 +659,39 @@ namespace NFC_Controller
             return false;
         }
 
+        // Helper function to determine card type based on TargetInfo
+        CardVariant PN532_chip::createCardFromTargetInfo(const TargetInfo& targetInfo)
+        {
+            // Determine card type based on SAK (Select Acknowledge) value
+            // SAK values reference:
+            // 0x08: MIFARE Classic 1K
+            // 0x09: MIFARE Mini
+            // 0x18: MIFARE Classic 4K
+            // 0x20: MIFARE DESFire (or other ISO-DEP cards)
+            // 0x28: JCOP cards
+            
+            const uint8_t sak = targetInfo.sak;
+            
+            // Check for MIFARE Classic (SAK = 0x08, 0x09, or 0x18)
+            if (sak == 0x08 || sak == 0x09 || sak == 0x18) {
+                Log("Detected MIFARE Classic card (SAK: 0x" + std::to_string(sak) + ")\n");
+                return MifareClassicCard{targetInfo};
+            }
+            
+            // Check for DESFire or ISO-DEP compliant cards (SAK bit 5 set = 0x20)
+            if ((sak & 0x20) != 0) {
+                Log("Detected MIFARE DESFire card (SAK: 0x" + std::to_string(sak) + ")\n");
+                
+                // Could potentially differentiate between EV1/EV2/EV3 based on ATS
+                // For now, return base DESFire card
+                return MifareDesfireCard{targetInfo};
+            }
+            
+            // Unknown card type
+            Log("Unknown card type (SAK: 0x" + std::to_string(sak) + ")\n");
+            return std::monostate{};
+        }
+
         CardVariant PN532_chip::detectCard(TargetType targetType)
         {
             Log("Detecting card...\n");
@@ -679,7 +712,6 @@ namespace NFC_Controller
             }
 
             Log("Number of detected targets: " + std::to_string(inListPassiveTargetCommand.getDetectedTargets().size()) + "\n");
-
             if (inListPassiveTargetCommand.getDetectedTargets().empty())
             {
                 Log("No card detected.\n");
@@ -687,6 +719,8 @@ namespace NFC_Controller
             }
 
             auto cardinfo = inListPassiveTargetCommand.getDetectedTargets();
+
+            
             for(const auto &c : cardinfo) {
                 Log("Detected card UID: ");
                 for (auto byte : c.uid) {
@@ -694,7 +728,9 @@ namespace NFC_Controller
                 }
                 std::cout << std::endl;
             }
-            return MifareDesfireCard{cardinfo[0]};
+
+            // Determine and return the appropriate card type for the first detected card
+            return createCardFromTargetInfo(cardinfo[0]);
         }
 
         statusCode PN532_chip::setSerialBaudrate(const baudRate br)

@@ -432,6 +432,14 @@ namespace NFC_Controller
 
         private:
             setupSendCommand buildFrame(const CommandRequest &request);
+            
+            /// \brief
+            /// Helper function to create appropriate CardVariant based on TargetInfo
+            /// \details
+            /// Determines the card type based on SAK value and other target information
+            /// @param  targetInfo  Target information containing UID, ATQA, SAK, and ATS
+            /// @return CardVariant Card object of appropriate type (MifareClassic, DESFire, etc.) or monostate if unknown
+            CardVariant createCardFromTargetInfo(const TargetInfo& targetInfo);
         }; // Class PN532_Chip
     } // namespace Cpp
 } // namespace NFC_Controller

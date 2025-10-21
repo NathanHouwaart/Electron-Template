@@ -19,6 +19,7 @@
 #include "Cards/DesfireEV1.h"
 #include "Cards/DesfireEV2.h"
 #include "Cards/DesfireEV3.h"
+#include "Cards/MifareClassic.h"
 
 namespace NFC_Controller
 {
@@ -31,6 +32,7 @@ namespace NFC_Controller
         /// It can hold a MifareDesfireCard, MifareDesfireEV1Card, MifareDesfireEV2Card, or MifareDesfireEV3Card.
         using CardVariant = std::variant<
             std::monostate,
+            MifareClassicCard,
             MifareDesfireCard,
             MifareDesfireEV1Card
             // MifareDesfireEV2Card,
