@@ -220,7 +220,31 @@ Napi::Value PN532_Wrapper::GetVersion(const Napi::CallbackInfo &info)
     using TargetType = NFC_Controller::Cpp::TargetType;
 
     auto detectedCard = m_nfc_chip->detectCard(TargetType::TypeA_106kbps);
-    
+
+    // Read-only access example for DESFire base
+    if (auto df = std::get_if<MifareDesfireEV2Card>(&detectedCard)) {
+        DesfireVersionInfo info;
+        if (df->getVersion(info)) {
+            std::cout << "Desfire SW version: "
+                      << int(info.softwareInfo.swMajorVersion) << "."
+                      << int(info.softwareInfo.swMinorVersion) << std::endl;
+        }
+        return Napi::Boolean::New(env, true);
+    }
+
+    // Mifare Classic example
+    if (auto mc = std::get_if<MifareClassicCard>(&detectedCard)) {
+        std::cout << "MIFARE Classic UID:";
+        for (auto b : mc->uid()) std::cout << " " << Hex0x(b);
+        std::cout << std::endl;
+        return Napi::Boolean::New(env, true);
+    }
+
+    std::cout << "No usable card inside variant (monostate or unknown type)\n";    
+
+    Napi::Error::New(env, "No usable card detected")
+        .ThrowAsJavaScriptException();
+    return Napi::Boolean::New(env, false);
 
     // if(!m_nfc_chip->detectCard(cardInfo, cardNumber, cardType, &response)){
     //     Napi::Error::New(env, "No card detected")
@@ -234,8 +258,6 @@ Napi::Value PN532_Wrapper::GetVersion(const Napi::CallbackInfo &info)
     //         .ThrowAsJavaScriptException();
     //     return Napi::Boolean::New(env, false);
     // }
-
-    return Napi::Boolean::New(env, true);
 }
 
 Napi::Value PN532_Wrapper::RunSelfTests(const Napi::CallbackInfo &info)

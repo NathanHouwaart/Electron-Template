@@ -34,9 +34,9 @@ namespace NFC_Controller
             std::monostate,
             MifareClassicCard,
             MifareDesfireCard,
-            MifareDesfireEV1Card
-            // MifareDesfireEV2Card,
-            // MifareDesfireEV3Card
+            MifareDesfireEV1Card,
+            MifareDesfireEV2Card,
+            MifareDesfireEV3Card
         >;
     }
 }
