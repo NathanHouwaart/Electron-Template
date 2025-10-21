@@ -196,5 +196,5 @@ Napi::Function PN532_Wrapper::GetClass(Napi::Env env)
          InstanceMethod("disconnect", &PN532_Wrapper::Disconnect),
          InstanceMethod("getFirmwareVersion", &PN532_Wrapper::GetFirmwareVersion),
          InstanceMethod("getVersion", &PN532_Wrapper::GetVersion),
-         InstanceMethod("runSelfTests", &PN532_Wrapper::RunSelfTests)});
+        });
 }
