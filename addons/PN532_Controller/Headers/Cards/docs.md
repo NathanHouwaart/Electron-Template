@@ -77,3 +77,22 @@ flowchart TD
 
 
 ```
+
+### Why AES Fails on a Factory Card
+
+`91 AE` is the DESFire status “authentication error.” The PN532 is talking to the PICC, but the card refuses to start the AES handshake because key slot `0x00` still contains the factory 2K3DES key (24 bytes of zeros). Until you prove knowledge of that DES/3DES key and replace it with an AES key, every `AuthenticateAES (0xAA)` request on that slot will be rejected with `91 AE`.
+
+Steps to convert a fresh card:
+
+1. **Select the PICC application**  
+   `90 5A 00 00 03 00 00 00 00`
+2. **Authenticate with the default 2K3DES key**  
+   Use `Authenticate (0x0A)` or `AuthenticateISO (0x1A)` against key `0x00`. The key material is 24 zero bytes from the factory.
+3. **Change the key type to AES**  
+   Issue `ChangeKey (0xC4)` for key `0x00`, set bit 7 of `P1` (new type = AES), provide the new 16-byte AES key XORed with the old key, and append the CRC16 required by the datasheet.
+4. **Switch to AES authentication**  
+   Once the key type becomes AES, `90 AA keyNo 00 01 keyNo 00` returns the encrypted `RndB` challenge so you can finish the AES handshake.
+
+To confirm the key type before (or after) the change, call `GetKeySettings (90 45 00 00 00)`. The response’s lower nibble encodes the key type: `0x00` = 2K3DES, `0x09` = AES. When you see `0x09`, the AES authenticate path will succeed.
+
+

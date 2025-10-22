@@ -188,8 +188,20 @@ namespace NFC_Controller::Cpp
             
             // Extract data received from card (everything after status byte)
             if (frame.length > 1) {
+                // std::cout << "frame.finalBuffer length: " << int(frame.length) << std::endl;
+                // for (size_t i = 1; i < frame.length; ++i) {
+                //     std::cout << Hex0x(frame.finalBuffer[i]) << " ";
+                // }
+                // std::cout << std::dec << std::endl;
+
                 result.responsePayload.assign(frame.finalBuffer + 1,
                                             frame.finalBuffer + frame.length);
+
+                // std::cout << "Parsed response payload: ";
+                // for (const auto& byte : result.responsePayload) {
+                //     std::cout << Hex0x(byte) << " ";
+                // }
+                // std::cout << std::dec << std::endl;
             }
             
             // Cache the response for getter access

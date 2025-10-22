@@ -18,7 +18,7 @@ class MyAddonConan(ConanFile):
             
             # Note: Conan 2.x will handle the switch between /MD (Release) 
             # and /MDd (Debug) automatically based on self.settings.build_type
-            # when you use the 'dynamic' setting.
+            # when you use the 'dynamic' setting[]
 
     def layout(self):
         self.folders.generators = os.path.join("build", "generators")

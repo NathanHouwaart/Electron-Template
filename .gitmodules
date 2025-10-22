@@ -1,3 +1,12 @@
 [submodule "DocklingPdf"]
 	path = DocklingPdf
 	url = https://github.com/NathanHouwaart/DocklingPdf
+[submodule "addons/external/tiny-aes"]
+	path = addons/external/tiny-aes
+	url = https://github.com/kokke/tiny-AES-c
+[submodule "addons/external/des"]
+	path = addons/external/des
+	url = https://github.com/tarequeh/DES.git
+[submodule "addons/external/cppDes"]
+	path = addons/external/cppDes
+	url = https://github.com/fffaraz/cppDES

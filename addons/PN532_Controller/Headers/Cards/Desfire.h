@@ -134,5 +134,7 @@ protected:
     
     // Helper to parse version response frames
     bool parseVersionFrame(const uint8_t* data, uint8_t responseSize, uint8_t frameIndex);
+
+    std::vector<uint8_t> getDesfireFullResponse(std::vector<uint8_t> initialApdu, int maxFrames = 10);
 };
 

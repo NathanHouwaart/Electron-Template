@@ -4,6 +4,22 @@
 #include <iostream>
 #include <iomanip>
 #include "../../Headers/Commands/inDataExchange.h"
+#include "aes.hpp"
+#include "cppdes/des3.h"
+#include <algorithm>
+
+namespace {
+std::array<uint8_t,8> rotateLeft(std::array<uint8_t,8> value) {
+    std::array<uint8_t,8> out{};
+    std::rotate_copy(value.begin() + 1, value.end(), value.begin(), out.begin());
+    return out;
+}
+std::array<uint8_t,8> rotateRight(std::array<uint8_t,8> value) {
+    std::array<uint8_t,8> out{};
+    std::rotate_copy(value.end() - 1, value.end(), value.begin(), out.begin());
+    return out;
+}
+} // namespace
 
 // Helper to output DESFire version info (inspired by desfire.cpp)
 std::ostream &operator<<(std::ostream &os, const DesfireVersionInfo &v)
@@ -141,36 +157,86 @@ void MifareDesfireCard::selectApplication(uint32_t aid)
 }
 
 void MifareDesfireCard::authenticate(){
+    using namespace NFC_Controller::Cpp;
+    
     Log("Executing DESFire Authenticate command via InDataExchange\n");
     
-
     this->selectApplication(0x000000); // Select PICC/master application first
 
+    // Step 1 – start legacy 3DES authentication
     uint8_t cmd[] = { 0x90, 0x0A, 0x00, 0x00, 0x01, 0x00, 0x00 };
-
-    using namespace NFC_Controller::Cpp;
-
     auto command = InDataExchangeCommand(
         InDataExchangeCommand::Options{
             .payload = std::vector<uint8_t>(cmd, cmd + sizeof(cmd)),
-            .responseTimeoutMs = 2000});
-
+            .responseTimeoutMs = 2000}
+    );
     auto result = nfc_->executeCommand(command);
 
     if (result.status != pn532Response::statusCode::OK)
     {
-        Log("ERROR: authenticateAES failed with status: " + std::to_string(static_cast<int>(result.status)) + "\n");
+        Log("ERROR: authenticate failed with status: " + std::to_string(static_cast<int>(result.status)) + "\n");
         return;
     }
 
-    std::cout << "authenticateAES response: ";
+    std::cout << "authenticate response: ";
     for (auto byte : result.responsePayload)
     {
-        std::cout << "0x" << Hex0x(byte) << " ";
+        std::cout << Hex0x(byte) << " ";
     }
     std::cout << std::dec << std::endl;
+    
 
-    return;
+    // The card must reply with 8 encrypted bytes followed by 91 AF
+    if (result.responsePayload.size() < 10 ||
+        result.responsePayload[result.responsePayload.size() - 2] != 0x91 ||
+        result.responsePayload[result.responsePayload.size() - 1] != 0xAF) {
+        Log("ERROR: unexpected DESFire auth response\n");
+        return;
+    }
+
+    std::array<uint8_t,8> encRndB{};
+    std::copy_n(result.responsePayload.begin(), 8, encRndB.begin());
+    
+    // Step 2 – decrypt RndB using 2-key 3DES ECB
+    // Factory default PICC master key: two zero 64-bit DES keys
+    ui64 key1 = 0x0000000000000000ULL;  // First 8 bytes (all zeros)
+    ui64 key2 = 0x0000000000000000ULL;  // Second 8 bytes (all zeros)
+    
+    // For 2-key 3DES: K1 and K3 are the same
+    DES3 des3(key1, key2, key1);
+    
+    std::cout << "Encrypted RndB bytes: ";
+    for (auto byte : encRndB) {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << std::endl;
+    
+    // Convert 8-byte array to ui64 (big-endian: first byte is MSB)
+    ui64 encRndB_u64 = 0;
+    for (int i = 0; i < 8; i++) {
+        encRndB_u64 = (encRndB_u64 << 8) | encRndB[i];
+    }
+    
+    std::cout << "encRndB_u64: 0x" << std::hex << std::setw(16) << std::setfill('0') << encRndB_u64 << std::dec << std::endl;
+    
+    // Decrypt the challenge
+    ui64 rndB_u64 = des3.decrypt(encRndB_u64);
+    
+    std::cout << "rndB_u64: 0x" << std::hex << std::setw(16) << std::setfill('0') << rndB_u64 << std::dec << std::endl;
+    
+    // Convert back to byte array (big-endian: MSB first)
+    std::array<uint8_t,8> rndB{};
+    for (int i = 7; i >= 0; i--) {
+        rndB[i] = static_cast<uint8_t>(rndB_u64 & 0xFF);
+        rndB_u64 >>= 8;
+    }
+    
+    std::cout << "Decrypted RndB: ";
+    for (auto byte : rndB) {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << std::endl;
+
     return;
 }
 
@@ -183,25 +249,34 @@ void MifareDesfireCard::authenticateAES(uint8_t keyNo, const std::array<uint8_t,
 
     using namespace NFC_Controller::Cpp;
 
-    auto command = InDataExchangeCommand(
-        InDataExchangeCommand::Options{
-            .payload = std::vector<uint8_t>(cmd, cmd + sizeof(cmd)),
-            .responseTimeoutMs = 2000});
-
-    auto result = nfc_->executeCommand(command);
-
-    if (result.status != pn532Response::statusCode::OK)
-    {
-        Log("ERROR: authenticateAES failed with status: " + std::to_string(static_cast<int>(result.status)) + "\n");
-        return;
-    }
-
+    auto res = getDesfireFullResponse(std::vector<uint8_t>(cmd, cmd + sizeof(cmd)));
     std::cout << "authenticateAES response: ";
-    for (auto byte : result.responsePayload)
+    for (auto byte : res)
     {
-        std::cout << "0x" << Hex0x(byte) << " ";
+        std::cout << Hex0x(byte) << " ";
     }
     std::cout << std::dec << std::endl;
+
+
+    // auto command = InDataExchangeCommand(
+    //     InDataExchangeCommand::Options{
+    //         .payload = std::vector<uint8_t>(cmd, cmd + sizeof(cmd)),
+    //         .responseTimeoutMs = 2000});
+
+    // auto result = nfc_->executeCommand(command);
+
+    // if (result.status != pn532Response::statusCode::OK)
+    // {
+    //     Log("ERROR: authenticateAES failed with status: " + std::to_string(static_cast<int>(result.status)) + "\n");
+    //     return;
+    // }
+
+    // std::cout << "authenticateAES response: ";
+    // for (auto byte : result.responsePayload)
+    // {
+    //     std::cout << "0x" << Hex0x(byte) << " ";
+    // }
+    // std::cout << std::dec << std::endl;
 
     return;
 }
@@ -342,4 +417,64 @@ uint8_t MifareDesfireCard::getDesfireVariant()
     Log("WARNING: Unknown DESFire variant (SW Major version: 0x" +
         std::to_string(swMajor) + ")\n");
     return 0;
+}
+
+
+std::vector<uint8_t> MifareDesfireCard::getDesfireFullResponse(std::vector<uint8_t> initialApdu, int maxFrames)
+{
+    std::vector<uint8_t> aggregated;
+    std::vector<uint8_t> apdu = initialApdu;
+
+    int frame = 0;
+    uint8_t statusByte1 = 0;    // Bytes to indicate more frames
+    uint8_t statusByte2 = 0;    // 
+
+    do{
+        std::vector<uint8_t> responseBuffer;
+        using namespace NFC_Controller::Cpp;
+
+        auto command = InDataExchangeCommand(
+            InDataExchangeCommand::Options{
+                .payload = apdu,
+                .responseTimeoutMs = 2000});
+
+        auto result = nfc_->executeCommand(command);
+
+        if (result.status != pn532Response::statusCode::OK)
+        {
+            Log("ERROR: getDesfireFullResponse initDataExchange failed with status: " + std::to_string(static_cast<int>(result.status)) + "\n");
+            return {};
+        }
+
+        responseBuffer = result.responsePayload;
+
+        if (responseBuffer.size() < 2)
+        {
+            Log("ERROR: getDesfireFullResponse Response too short (got " + std::to_string(responseBuffer.size()) + " bytes)\n");
+            return {};
+        }
+
+        // Extract status bytes
+        statusByte1 = responseBuffer[responseBuffer.size() - 2];
+        statusByte2 = responseBuffer[responseBuffer.size() - 1];
+
+        // Append data portion (excluding status bytes)
+        aggregated.insert(aggregated.end(), responseBuffer.begin(), responseBuffer.end() - 2);
+
+        // Prepare next APDU for continuation if needed
+        if (statusByte1 == 0x91 && statusByte2 == 0xAF)
+        {
+            apdu = {0x90, 0xAF, 0x00, 0x00, 0x00}; // Continuation command
+        }
+
+        frame++;
+    } while (statusByte1 == 0x91 && statusByte2 == 0xAF && frame < maxFrames);
+
+        // Accept final success pairs 0x91/0x00 or 0x90/0x00
+    if (!((statusByte1 == 0x91 && statusByte2 == 0x00) || (statusByte1 == 0x90 && statusByte2 == 0x00))) {
+        Log("DESFire returned error status\n");
+        return {};
+    }
+
+    return aggregated;
 }
