@@ -9,6 +9,17 @@ class MyAddonConan(ConanFile):
     generators = ("CMakeDeps", "CMakeToolchain")
     settings = "os", "compiler", "build_type", "arch"
 
+    def configure(self):
+        # We only care about Windows builds using MSVC
+        if self.settings.os == "Windows" and self.settings.compiler == "msvc":
+            # For Release, RelWithDebInfo, and Debug builds, 
+            # we want the DLL (Dynamic) runtime, which corresponds to /MD or /MDd.
+            self.settings.compiler.runtime = "dynamic" 
+            
+            # Note: Conan 2.x will handle the switch between /MD (Release) 
+            # and /MDd (Debug) automatically based on self.settings.build_type
+            # when you use the 'dynamic' setting.
+
     def layout(self):
         self.folders.generators = os.path.join("build", "generators")
 
