@@ -231,7 +231,8 @@ Napi::Value PN532_Wrapper::GetVersion(const Napi::CallbackInfo &info)
         // }
         Sleep(1000);
         std::array<uint8_t, 16> RndB = {};
-        df->authenticateAES(0x00, RndB);            // Authenticate with key 0 on AES
+        // df->authenticateAES(0x00, RndB);            // Authenticate with key 0 on AES
+        df->authenticate();
 
         return Napi::Boolean::New(env, true);
     }

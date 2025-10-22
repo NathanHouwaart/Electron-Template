@@ -114,10 +114,11 @@ public:
         return "MIFARE DESFire";
     }
 
-    virtual void selectApplication(uint32_t aid) {}
+    virtual void selectApplication(uint32_t aid);
     virtual void readData(uint8_t fileNo, std::vector<uint8_t>& outData) {}
     virtual void writeData(uint8_t fileNo, const std::vector<uint8_t>& data) {}
 
+    virtual void authenticate();
     virtual void authenticateAES(uint8_t keyNo, const std::array<uint8_t, 16>& RndB);
     
     // Get version information from the card via InDataExchange
