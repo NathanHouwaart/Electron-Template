@@ -1,8 +1,9 @@
 #include "../../Headers/Cards/Desfire.h"
-#include "../../Headers/nfc.h"
+#include "../../Headers/pn532.h"
 #include "../../../AddonLog.h"
 #include <iostream>
 #include <iomanip>
+#include "../../Headers/Commands/inDataExchange.h"
 
 // Helper to output DESFire version info (inspired by desfire.cpp)
 std::ostream& operator<<(std::ostream& os, const DesfireVersionInfo& v)
@@ -96,6 +97,40 @@ bool MifareDesfireCard::parseVersionFrame(const uint8_t* data, uint8_t responseS
     }
 
     return true;
+}
+
+void MifareDesfireCard::authenticateAES(uint8_t keyNo, const std::array<uint8_t, 16>& RndB)
+{
+    Log("Executing DESFire AuthenticateAES command via InDataExchange on keyNo " + std::to_string(keyNo) + "\n");
+
+    // Frame: 90 AA <keyNo> 00 01 <keyNo> 00
+    uint8_t cmd[] = {0x90, 0xAA, keyNo, 0x00, 0x01, keyNo, 0x00};
+
+    using namespace NFC_Controller::Cpp;
+
+    auto command = InDataExchangeCommand(
+        InDataExchangeCommand::Options{
+            .payload = std::vector<uint8_t>(cmd, cmd + sizeof(cmd)),
+            .responseTimeoutMs = 2000
+        }
+    );
+
+    auto result = nfc_->executeCommand(command);
+
+    if (result.status != pn532Response::statusCode::OK)
+    {
+        Log("ERROR: authenticateAES failed with status: " + std::to_string(static_cast<int>(result.status)) + "\n");
+        return;
+    }
+
+    std::cout << "authenticateAES response: ";
+    for (auto byte : result.responsePayload)
+    {
+        std::cout << "0x" << Hex0x(byte) << " ";
+    }
+    std::cout << std::dec << std::endl;
+
+    return;
 }
 
 bool MifareDesfireCard::getVersion(DesfireVersionInfo& versionInfo)

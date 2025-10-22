@@ -223,12 +223,16 @@ Napi::Value PN532_Wrapper::GetVersion(const Napi::CallbackInfo &info)
 
     // Read-only access example for DESFire base
     if (auto df = std::get_if<MifareDesfireEV2Card>(&detectedCard)) {
-        DesfireVersionInfo info;
-        if (df->getVersion(info)) {
-            std::cout << "Desfire SW version: "
-                      << int(info.softwareInfo.swMajorVersion) << "."
-                      << int(info.softwareInfo.swMinorVersion) << std::endl;
-        }
+        // DesfireVersionInfo info;
+        // if (df->getVersion(info)) {
+        //     std::cout << "Desfire SW version: "
+        //               << int(info.softwareInfo.swMajorVersion) << "."
+        //               << int(info.softwareInfo.swMinorVersion) << std::endl;
+        // }
+        Sleep(1000);
+        std::array<uint8_t, 16> RndB = {};
+        df->authenticateAES(0x00, RndB);            // Authenticate with key 0 on AES
+
         return Napi::Boolean::New(env, true);
     }
 

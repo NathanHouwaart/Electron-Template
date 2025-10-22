@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../card.h"
-#include "../declarations.h"
 #include <cstdint>
 #include <vector>
 #include <cstring>
@@ -10,9 +9,46 @@
 // Forward declaration
 namespace NFC_Controller {
     namespace Cpp {
-        class NFC;
+        class PN532_chip;
     }
 }
+
+enum class DesfireCommand : uint8_t {
+    // Authentication
+    AUTHENTICATE = 0x0A,
+    AUTHENTICATE_ISO = 0x1A,
+    AUTHENTICATE_AES = 0xAA,
+    AUTHENTICATE_EV2_FIRST = 0x71,
+    AUTHENTICATE_EV2_NONFIRST = 0x77,
+    
+    // PICC Management
+    GET_VERSION = 0x60,
+    GET_CARD_UID = 0x51,
+    FORMAT_PICC = 0xFC,
+    
+    // Application Management
+    CREATE_APPLICATION = 0xCA,
+    DELETE_APPLICATION = 0xDA,
+    SELECT_APPLICATION = 0x5A,
+    GET_APPLICATION_IDS = 0x6A,
+    
+    // File Management
+    CREATE_STD_DATA_FILE = 0xCD,
+    DELETE_FILE = 0xDF,
+    GET_FILE_IDS = 0x6F,
+    
+    // Data Operations
+    READ_DATA = 0xBD,
+    WRITE_DATA = 0x3D,
+    GET_VALUE = 0x6C,
+    
+    // Transaction
+    COMMIT_TRANSACTION = 0xC7,
+    ABORT_TRANSACTION = 0xA7,
+    
+    // Utility
+    ADDITIONAL_FRAME = 0xAF
+};
 
 // Use packed structures for proper memory layout matching DESFire response format
 #if defined(_MSC_VER)
@@ -69,18 +105,20 @@ std::ostream& operator<<(std::ostream& os, const DesfireVersionInfo& v);
 
 class MifareDesfireCard : public Card {
 public:
-    virtual std::string prettyType() const override {
-        return "MIFARE DESFire";
-    }
-
-    MifareDesfireCard(TargetInfo id, NFC_Controller::Cpp::NFC* nfc = nullptr)
+    MifareDesfireCard(TargetInfo id, NFC_Controller::Cpp::PN532_chip* nfc = nullptr)
         : Card(std::move(id)), nfc_(nfc), versionRetrieved_(false) {
         std::memset(&versionInfo_, 0, sizeof(versionInfo_));
+    }
+
+    virtual std::string prettyType() const override {
+        return "MIFARE DESFire";
     }
 
     virtual void selectApplication(uint32_t aid) {}
     virtual void readData(uint8_t fileNo, std::vector<uint8_t>& outData) {}
     virtual void writeData(uint8_t fileNo, const std::vector<uint8_t>& data) {}
+
+    virtual void authenticateAES(uint8_t keyNo, const std::array<uint8_t, 16>& RndB);
     
     // Get version information from the card via InDataExchange
     virtual bool getVersion(DesfireVersionInfo& versionInfo);
@@ -89,7 +127,7 @@ public:
     virtual uint8_t getDesfireVariant();
 
 protected:
-    NFC_Controller::Cpp::NFC* nfc_;
+    NFC_Controller::Cpp::PN532_chip* nfc_;
     DesfireVersionInfo versionInfo_;
     bool versionRetrieved_;
     

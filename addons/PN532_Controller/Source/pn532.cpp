@@ -31,11 +31,18 @@ namespace NFC_Controller
 
         CommandResult PN532_chip::executeCommand(IPn532Command &command)
         {
+            Log("Executing command: " + std::string(command.name()));
             // 1. Let the command describe what it needs.
             const auto request = command.buildRequest();
 
             // 2. Build the frame that will be sent to the PN532.
             auto frame = buildFrame(request);
+
+            std::cout << "Sending frame: ";
+            for(uint8_t i = 0; i < frame.length; i++){
+                std::cout << Hex0x(frame.finalBuffer[i]) << " ";
+            }
+            std::cout << std::dec << std::endl;
 
             // 3. Send frame and wait for ACK.
             const auto ack = sendAndAcknowlegdeCommand(frame);
