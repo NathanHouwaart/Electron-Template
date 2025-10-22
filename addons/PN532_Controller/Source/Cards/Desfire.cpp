@@ -6,6 +6,7 @@
 #include "../../Headers/Commands/inDataExchange.h"
 #include "aes.hpp"
 #include "cppdes/des3.h"
+#include "cppdes/des3cbc.h"
 #include <algorithm>
 #include <random>
 
@@ -278,26 +279,30 @@ void MifareDesfireCard::authenticate(){
     }
     std::cout << std::endl;
     
-    // Step 6 – encrypt the 16-byte challenge using 2-key 3DES ECB (two 8-byte blocks)
+    // Step 6 – encrypt the 16-byte challenge using 2-key 3DES CBC (two 8-byte blocks, IV=0)
     std::array<uint8_t,16> encHostChallenge{};
+    
+    // Create 3DES CBC cipher with IV = 0
+    ui64 iv = 0x0000000000000000ULL;
+    DES3CBC des3cbc(key1, key2, key1, iv);
     
     // Encrypt first 8 bytes (RndA)
     ui64 block1_u64 = 0;
     for (int i = 0; i < 8; i++) {
         block1_u64 = (block1_u64 << 8) | hostChallenge[i];
     }
-    ui64 encBlock1_u64 = des3.encrypt(block1_u64);
+    ui64 encBlock1_u64 = des3cbc.encrypt(block1_u64);
     for (int i = 7; i >= 0; i--) {
         encHostChallenge[i] = static_cast<uint8_t>(encBlock1_u64 & 0xFF);
         encBlock1_u64 >>= 8;
     }
     
-    // Encrypt second 8 bytes (rotated RndB)
+    // Encrypt second 8 bytes (rotated RndB) - CBC mode chains automatically
     ui64 block2_u64 = 0;
     for (int i = 0; i < 8; i++) {
         block2_u64 = (block2_u64 << 8) | hostChallenge[8 + i];
     }
-    ui64 encBlock2_u64 = des3.encrypt(block2_u64);
+    ui64 encBlock2_u64 = des3cbc.encrypt(block2_u64);
     for (int i = 7; i >= 0; i--) {
         encHostChallenge[8 + i] = static_cast<uint8_t>(encBlock2_u64 & 0xFF);
         encBlock2_u64 >>= 8;
@@ -308,6 +313,87 @@ void MifareDesfireCard::authenticate(){
         std::cout << Hex0x(byte) << " ";
     }
     std::cout << std::endl;
+
+    // Step 7 – send encrypted challenge to card via Additional Frame (0xAF)
+    std::vector<uint8_t> afCmd;
+    afCmd.push_back(0x90);  // CLA
+    afCmd.push_back(0xAF);  // INS = Additional Frame
+    afCmd.push_back(0x00);  // P1
+    afCmd.push_back(0x00);  // P2
+    afCmd.push_back(0x10);  // Lc = 16 bytes
+    // Add the 16 encrypted bytes
+    afCmd.insert(afCmd.end(), encHostChallenge.begin(), encHostChallenge.end());
+    afCmd.push_back(0x00);  // Le
+    
+    auto afCommand = InDataExchangeCommand(
+        InDataExchangeCommand::Options{
+            .payload = afCmd,
+            .responseTimeoutMs = 2000}
+    );
+    auto afResult = nfc_->executeCommand(afCommand);
+
+    if (afResult.status != pn532Response::statusCode::OK)
+    {
+        Log("ERROR: Additional Frame failed with status: " + std::to_string(static_cast<int>(afResult.status)) + "\n");
+        return;
+    }
+
+    std::cout << "Card verification response: ";
+    for (auto byte : afResult.responsePayload)
+    {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << std::dec << std::endl;
+    
+    // The card must reply with 8 encrypted bytes followed by 0x91 0x00 (success)
+    if (afResult.responsePayload.size() < 10 ||
+        afResult.responsePayload[afResult.responsePayload.size() - 2] != 0x91 ||
+        afResult.responsePayload[afResult.responsePayload.size() - 1] != 0x00) {
+        Log("ERROR: unexpected card verification response\n");
+        return;
+    }
+    
+    std::array<uint8_t,8> encRndA_rotated{};
+    std::copy_n(afResult.responsePayload.begin(), 8, encRndA_rotated.begin());
+    
+    // Step 8 – decrypt the card's response (rotated RndA)
+    ui64 encRndA_rotated_u64 = 0;
+    for (int i = 0; i < 8; i++) {
+        encRndA_rotated_u64 = (encRndA_rotated_u64 << 8) | encRndA_rotated[i];
+    }
+    
+    ui64 rndA_rotated_u64 = des3.decrypt(encRndA_rotated_u64);
+    
+    std::array<uint8_t,8> rndA_rotated{};
+    for (int i = 7; i >= 0; i--) {
+        rndA_rotated[i] = static_cast<uint8_t>(rndA_rotated_u64 & 0xFF);
+        rndA_rotated_u64 >>= 8;
+    }
+    
+    std::cout << "Decrypted rotated RndA from card: ";
+    for (auto byte : rndA_rotated) {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << std::endl;
+    
+    // Step 9 – rotate right to get original RndA and verify
+    std::array<uint8_t,8> rndA_verified = rotateRight(rndA_rotated);
+    
+    std::cout << "RndA after rotating right: ";
+    for (auto byte : rndA_verified) {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << std::endl;
+    
+    // Verify it matches our original RndA
+    if (rndA == rndA_verified) {
+        std::cout << "✅ AUTHENTICATION SUCCESSFUL! RndA matches!" << std::endl;
+        Log("DESFire authentication succeeded\n");
+    } else {
+        std::cout << "❌ AUTHENTICATION FAILED! RndA mismatch!" << std::endl;
+        Log("ERROR: Authentication failed - RndA verification mismatch\n");
+        return;
+    }
 
     return;
 }
