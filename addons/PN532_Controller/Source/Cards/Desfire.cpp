@@ -7,16 +7,19 @@
 #include "aes.hpp"
 #include "cppdes/des3.h"
 #include <algorithm>
+#include <random>
 
 namespace {
 std::array<uint8_t,8> rotateLeft(std::array<uint8_t,8> value) {
     std::array<uint8_t,8> out{};
-    std::rotate_copy(value.begin() + 1, value.end(), value.begin(), out.begin());
+    // Rotate left by 1: [a,b,c,d,e,f,g,h] -> [b,c,d,e,f,g,h,a]
+    std::rotate_copy(value.begin(), value.begin() + 1, value.end(), out.begin());
     return out;
 }
 std::array<uint8_t,8> rotateRight(std::array<uint8_t,8> value) {
     std::array<uint8_t,8> out{};
-    std::rotate_copy(value.end() - 1, value.end(), value.begin(), out.begin());
+    // Rotate right by 1: [a,b,c,d,e,f,g,h] -> [h,a,b,c,d,e,f,g]
+    std::rotate_copy(value.begin(), value.end() - 1, value.end(), out.begin());
     return out;
 }
 } // namespace
@@ -233,6 +236,75 @@ void MifareDesfireCard::authenticate(){
     
     std::cout << "Decrypted RndB: ";
     for (auto byte : rndB) {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << std::endl;
+
+    // Step 3 – generate our own random RndA (8 bytes)
+    std::array<uint8_t,8> rndA{};
+    {
+        std::random_device rd;
+        std::mt19937_64 gen(rd());
+        std::uniform_int_distribution<uint16_t> dis(0, 255);
+        for (auto& byte : rndA) {
+            byte = static_cast<uint8_t>(dis(gen));
+        }
+    }
+    
+    std::cout << "Generated RndA: ";
+    for (auto byte : rndA) {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << std::endl;
+    
+    // Step 4 – rotate RndB left by 1 byte
+    std::cout << "Rotating RndB left by 1 byte\n";
+    std::array<uint8_t,8> rndB_rotated = rotateLeft(rndB);
+    
+    std::cout << "RndB rotated left: ";
+    for (auto byte : rndB_rotated) {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << std::endl;
+    
+    // Step 5 – concatenate RndA || rotated(RndB) = 16 bytes
+    std::array<uint8_t,16> hostChallenge{};
+    std::copy(rndA.begin(), rndA.end(), hostChallenge.begin());
+    std::copy(rndB_rotated.begin(), rndB_rotated.end(), hostChallenge.begin() + 8);
+    
+    std::cout << "Host challenge (RndA || RndB'): ";
+    for (auto byte : hostChallenge) {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << std::endl;
+    
+    // Step 6 – encrypt the 16-byte challenge using 2-key 3DES ECB (two 8-byte blocks)
+    std::array<uint8_t,16> encHostChallenge{};
+    
+    // Encrypt first 8 bytes (RndA)
+    ui64 block1_u64 = 0;
+    for (int i = 0; i < 8; i++) {
+        block1_u64 = (block1_u64 << 8) | hostChallenge[i];
+    }
+    ui64 encBlock1_u64 = des3.encrypt(block1_u64);
+    for (int i = 7; i >= 0; i--) {
+        encHostChallenge[i] = static_cast<uint8_t>(encBlock1_u64 & 0xFF);
+        encBlock1_u64 >>= 8;
+    }
+    
+    // Encrypt second 8 bytes (rotated RndB)
+    ui64 block2_u64 = 0;
+    for (int i = 0; i < 8; i++) {
+        block2_u64 = (block2_u64 << 8) | hostChallenge[8 + i];
+    }
+    ui64 encBlock2_u64 = des3.encrypt(block2_u64);
+    for (int i = 7; i >= 0; i--) {
+        encHostChallenge[8 + i] = static_cast<uint8_t>(encBlock2_u64 & 0xFF);
+        encBlock2_u64 >>= 8;
+    }
+    
+    std::cout << "Encrypted host challenge: ";
+    for (auto byte : encHostChallenge) {
         std::cout << Hex0x(byte) << " ";
     }
     std::cout << std::endl;
