@@ -247,15 +247,23 @@ Napi::Value PN532_Wrapper::GetVersion(const Napi::CallbackInfo &info)
         Sleep(1000);
         // std::array<uint8_t, 16> RndB = {};
         // // df->authenticateAES(0x00, RndB);            // Authenticate with key 0 on AES
-        
-        df->authenticate();
 
-        Sleep(200);
-
-        df->changeKey<desfire::DesfireKeyType::AES>(0x00, std::array<uint8_t, 16>{
+        df->authenticate<desfire::DesfireKeyType::DES3_2KEY>(0x00, {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
         });
+
+        // Sleep(1000);
+
+        df->changeKey<desfire::DesfireKeyType::DES3_2KEY>(0x00, {
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+        });
+
+        // // df->changeKey<desfire::DesfireKeyType::AES>(0x00, std::array<uint8_t, 16>{
+        // //     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        // //     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+        // // });
 
         return Napi::Boolean::New(env, true);
     }

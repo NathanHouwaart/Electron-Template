@@ -28,21 +28,18 @@ std::array<uint8_t,8> rotateRight(std::array<uint8_t,8> value) {
 // Polynomial: 0x8005, Initial value: 0x6363
 // This is used for ChangeKey command payload integrity
 uint16_t calculateCRC16(const uint8_t* data, size_t length) {
-    uint16_t crc = 0x6363;  // Initial value for DESFire
-    
-    for (size_t i = 0; i < length; i++) {
+    uint16_t crc = 0x6363;  // ISO/IEC 14443-3 Type A preset
+
+    for (size_t i = 0; i < length; ++i) {
         crc ^= static_cast<uint16_t>(data[i]);
-        for (int bit = 0; bit < 8; bit++) {
-            if (crc & 0x0001) {
-                crc = (crc >> 1) ^ 0x8005;  // Polynomial
-            } else {
-                crc = crc >> 1;
-            }
+        for (int bit = 0; bit < 8; ++bit) {
+            crc = (crc & 0x0001) ? (crc >> 1) ^ 0x8408 : (crc >> 1);
         }
     }
-    
+
     return crc;
 }
+
 } // namespace
 
 // Helper to output DESFire version info (inspired by desfire.cpp)
@@ -413,6 +410,7 @@ void MifareDesfireCard::authenticate(){
         // Store session data for ChangeKey (and other authenticated commands)
         sessionValid_ = true;
         currentKeyType_ = DesfireKeyType::DES3_2KEY;
+        currentKeyNo_ = 0;  // Legacy authenticate always uses key 0
         
         // Copy RndA and RndB to session storage (extend to 16 bytes for uniform storage)
         std::copy(rndA.begin(), rndA.end(), sessionRndA_.begin());
@@ -434,6 +432,361 @@ void MifareDesfireCard::authenticate(){
 
     return;
 }
+
+template<DesfireKeyType KeyType>
+bool MifareDesfireCard::authenticate(uint8_t keyNo, const std::array<uint8_t, DesfireKeyTraits<KeyType>::KeySize>& key) {
+    using namespace NFC_Controller::Cpp;
+    
+    constexpr size_t keySize = DesfireKeyTraits<KeyType>::KeySize;
+    constexpr size_t rndSize = (KeyType == DesfireKeyType::AES) ? 16 : 8;
+    constexpr uint8_t insCode = (KeyType == DesfireKeyType::AES) ? 0xAA : 0x0A;
+    
+    std::cout << "\n===============================================\n";
+    std::cout << " Authenticate: Key #" << int(keyNo) << " (" 
+              << DesfireKeyTraits<KeyType>::Name << ", " << keySize << " bytes)\n";
+    std::cout << "===============================================\n";
+    
+    Log("Executing DESFire Authenticate command via InDataExchange\n");
+    
+    selectApplication(0x000000); // Select PICC/master application first
+
+    // Step 1: Send authentication command (0x0A for DES/3DES, 0xAA for AES)
+    uint8_t cmd[] = { 0x90, insCode, 0x00, 0x00, 0x01, keyNo, 0x00 };
+    auto command = InDataExchangeCommand(
+        InDataExchangeCommand::Options{
+            .payload = std::vector<uint8_t>(cmd, cmd + sizeof(cmd)),
+            .responseTimeoutMs = 2000}
+    );
+    auto result = nfc_->executeCommand(command);
+
+    if (result.status != pn532Response::statusCode::OK)
+    {
+        Log("ERROR: authenticate failed with status: " + std::to_string(static_cast<int>(result.status)) + "\n");
+        std::cout << "❌ Authentication failed\n";
+        return false;
+    }
+
+    std::cout << "authenticate response: ";
+    for (auto byte : result.responsePayload)
+    {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << std::dec << std::endl;
+    
+    // The card must reply with rndSize encrypted bytes followed by 91 AF
+    if (result.responsePayload.size() < rndSize + 2 ||
+        result.responsePayload[result.responsePayload.size() - 2] != 0x91 ||
+        result.responsePayload[result.responsePayload.size() - 1] != 0xAF) {
+        Log("ERROR: unexpected DESFire auth response\n");
+        std::cout << "❌ Unexpected response format\n";
+        return false;
+    }
+
+    // Step 2: Decrypt RndB
+    std::array<uint8_t, rndSize> encRndB{};
+    std::copy_n(result.responsePayload.begin(), rndSize, encRndB.begin());
+    
+    std::cout << "Encrypted RndB bytes: ";
+    for (auto byte : encRndB) {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << std::endl;
+    
+    std::array<uint8_t, rndSize> rndB{};
+    
+    if constexpr (KeyType == DesfireKeyType::AES) {
+        // AES decryption (16-byte block)
+        struct AES_ctx ctx;
+        uint8_t iv[16] = {0};
+        AES_init_ctx_iv(&ctx, key.data(), iv);
+        
+        std::copy(encRndB.begin(), encRndB.end(), rndB.begin());
+        AES_CBC_decrypt_buffer(&ctx, rndB.data(), rndB.size());
+        
+    } else {
+        // 3DES decryption (8-byte block)
+        ui64 key1_u64 = 0, key2_u64 = 0, key3_u64 = 0;
+        
+        // Extract key components based on key size
+        for (int i = 0; i < 8; i++) {
+            key1_u64 = (key1_u64 << 8) | key[i];
+        }
+        
+        if constexpr (keySize >= 16) {
+            for (int i = 0; i < 8; i++) {
+                key2_u64 = (key2_u64 << 8) | key[8 + i];
+            }
+        } else {
+            key2_u64 = key1_u64;  // Single DES uses same key
+        }
+        
+        if constexpr (keySize >= 24) {
+            for (int i = 0; i < 8; i++) {
+                key3_u64 = (key3_u64 << 8) | key[16 + i];
+            }
+        } else {
+            key3_u64 = key1_u64;  // 2-key 3DES: K3 = K1
+        }
+        
+        DES3 des3(key1_u64, key2_u64, key3_u64);
+        
+        // Convert RndB to ui64 (big-endian)
+        ui64 encRndB_u64 = 0;
+        for (int i = 0; i < 8; i++) {
+            encRndB_u64 = (encRndB_u64 << 8) | encRndB[i];
+        }
+        
+        // Decrypt
+        ui64 rndB_u64 = des3.decrypt(encRndB_u64);
+        
+        // Convert back to byte array
+        for (int i = 7; i >= 0; i--) {
+            rndB[i] = static_cast<uint8_t>(rndB_u64 & 0xFF);
+            rndB_u64 >>= 8;
+        }
+    }
+    
+    std::cout << "Decrypted RndB: ";
+    for (auto byte : rndB) {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << std::endl;
+
+    // Step 3: Generate RndA
+    std::array<uint8_t, rndSize> rndA{};
+    {
+        std::random_device rd;
+        std::mt19937_64 gen(rd());
+        std::uniform_int_distribution<uint16_t> dis(0, 255);
+        for (auto& byte : rndA) {
+            byte = static_cast<uint8_t>(dis(gen));
+        }
+    }
+    
+    std::cout << "Generated RndA: ";
+    for (auto byte : rndA) {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << std::endl;
+    
+    // Step 4: Rotate RndB left by 1 byte
+    std::array<uint8_t, rndSize> rndB_rotated{};
+    if constexpr (rndSize == 8) {
+        rndB_rotated = rotateLeft(rndB);
+    } else {
+        // AES: 16-byte rotation
+        std::rotate_copy(rndB.begin(), rndB.begin() + 1, rndB.end(), rndB_rotated.begin());
+    }
+    
+    std::cout << "RndB rotated left: ";
+    for (auto byte : rndB_rotated) {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << std::endl;
+    
+    // Step 5: Build host challenge: RndA || RndB'
+    std::array<uint8_t, rndSize * 2> hostChallenge{};
+    std::copy(rndA.begin(), rndA.end(), hostChallenge.begin());
+    std::copy(rndB_rotated.begin(), rndB_rotated.end(), hostChallenge.begin() + rndSize);
+    
+    std::cout << "Host challenge (RndA || RndB'): ";
+    for (auto byte : hostChallenge) {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << std::endl;
+    
+    // Step 6: Encrypt host challenge
+    std::array<uint8_t, rndSize * 2> encHostChallenge{};
+    
+    if constexpr (KeyType == DesfireKeyType::AES) {
+        // AES encryption
+        struct AES_ctx ctx;
+        uint8_t iv[16] = {0};
+        AES_init_ctx_iv(&ctx, key.data(), iv);
+        
+        std::copy(hostChallenge.begin(), hostChallenge.end(), encHostChallenge.begin());
+        AES_CBC_encrypt_buffer(&ctx, encHostChallenge.data(), encHostChallenge.size());
+        
+    } else {
+        // 3DES CBC encryption
+        ui64 key1_u64 = 0, key2_u64 = 0, key3_u64 = 0;
+        for (int i = 0; i < 8; i++) key1_u64 = (key1_u64 << 8) | key[i];
+        if constexpr (keySize >= 16) {
+            for (int i = 0; i < 8; i++) key2_u64 = (key2_u64 << 8) | key[8 + i];
+        } else {
+            key2_u64 = key1_u64;
+        }
+        key3_u64 = key1_u64;  // For 2-key 3DES
+        
+        DES3CBC des3cbc(key1_u64, key2_u64, key3_u64, 0x0000000000000000ULL);
+        
+        // Encrypt two 8-byte blocks
+        for (size_t blockIdx = 0; blockIdx < 2; blockIdx++) {
+            ui64 block_u64 = 0;
+            for (size_t i = 0; i < 8; i++) {
+                block_u64 = (block_u64 << 8) | hostChallenge[blockIdx * 8 + i];
+            }
+            
+            ui64 encBlock_u64 = des3cbc.encrypt(block_u64);
+            
+            for (int i = 7; i >= 0; i--) {
+                encHostChallenge[blockIdx * 8 + i] = static_cast<uint8_t>(encBlock_u64 & 0xFF);
+                encBlock_u64 >>= 8;
+            }
+        }
+    }
+    
+    std::cout << "Encrypted host challenge: ";
+    for (auto byte : encHostChallenge) {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << std::endl;
+
+    // Step 7: Send encrypted challenge via Additional Frame
+    std::vector<uint8_t> afCmd;
+    afCmd.push_back(0x90);  // CLA
+    afCmd.push_back(0xAF);  // INS = Additional Frame
+    afCmd.push_back(0x00);  // P1
+    afCmd.push_back(0x00);  // P2
+    afCmd.push_back(rndSize * 2);  // Lc
+    afCmd.insert(afCmd.end(), encHostChallenge.begin(), encHostChallenge.end());
+    afCmd.push_back(0x00);  // Le
+    
+    auto afCommand = InDataExchangeCommand(
+        InDataExchangeCommand::Options{
+            .payload = afCmd,
+            .responseTimeoutMs = 2000}
+    );
+    auto afResult = nfc_->executeCommand(afCommand);
+
+    if (afResult.status != pn532Response::statusCode::OK)
+    {
+        Log("ERROR: Additional Frame failed with status: " + std::to_string(static_cast<int>(afResult.status)) + "\n");
+        std::cout << "❌ Challenge response failed\n";
+        return false;
+    }
+
+    std::cout << "Card verification response: ";
+    for (auto byte : afResult.responsePayload)
+    {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << std::dec << std::endl;
+    
+    // Card must reply with rndSize encrypted bytes followed by 0x91 0x00 (success)
+    if (afResult.responsePayload.size() < rndSize + 2 ||
+        afResult.responsePayload[afResult.responsePayload.size() - 2] != 0x91 ||
+        afResult.responsePayload[afResult.responsePayload.size() - 1] != 0x00) {
+        Log("ERROR: unexpected card verification response\n");
+        std::cout << "❌ Verification failed\n";
+        return false;
+    }
+    
+    // Step 8: Decrypt and verify RndA'
+    std::array<uint8_t, rndSize> encRndA_rotated{};
+    std::copy_n(afResult.responsePayload.begin(), rndSize, encRndA_rotated.begin());
+    
+    std::array<uint8_t, rndSize> rndA_rotated{};
+    
+    if constexpr (KeyType == DesfireKeyType::AES) {
+        // AES decryption
+        struct AES_ctx ctx;
+        uint8_t iv[16] = {0};
+        AES_init_ctx_iv(&ctx, key.data(), iv);
+        
+        std::copy(encRndA_rotated.begin(), encRndA_rotated.end(), rndA_rotated.begin());
+        AES_CBC_decrypt_buffer(&ctx, rndA_rotated.data(), rndA_rotated.size());
+        
+    } else {
+        // 3DES decryption
+        ui64 key1_u64 = 0, key2_u64 = 0, key3_u64 = 0;
+        for (int i = 0; i < 8; i++) key1_u64 = (key1_u64 << 8) | key[i];
+        if constexpr (keySize >= 16) {
+            for (int i = 0; i < 8; i++) key2_u64 = (key2_u64 << 8) | key[8 + i];
+        } else {
+            key2_u64 = key1_u64;
+        }
+        key3_u64 = key1_u64;
+        
+        DES3 des3(key1_u64, key2_u64, key3_u64);
+        
+        ui64 encRndA_rotated_u64 = 0;
+        for (int i = 0; i < 8; i++) {
+            encRndA_rotated_u64 = (encRndA_rotated_u64 << 8) | encRndA_rotated[i];
+        }
+        
+        ui64 rndA_rotated_u64 = des3.decrypt(encRndA_rotated_u64);
+        
+        for (int i = 7; i >= 0; i--) {
+            rndA_rotated[i] = static_cast<uint8_t>(rndA_rotated_u64 & 0xFF);
+            rndA_rotated_u64 >>= 8;
+        }
+    }
+    
+    std::cout << "Decrypted rotated RndA from card: ";
+    for (auto byte : rndA_rotated) {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << std::endl;
+    
+    // Step 9: Rotate right and verify
+    std::array<uint8_t, rndSize> rndA_verified{};
+    if constexpr (rndSize == 8) {
+        rndA_verified = rotateRight(rndA_rotated);
+    } else {
+        // AES: 16-byte rotation
+        std::rotate_copy(rndA_rotated.begin(), rndA_rotated.end() - 1, rndA_rotated.end(), rndA_verified.begin());
+    }
+    
+    std::cout << "RndA after rotating right: ";
+    for (auto byte : rndA_verified) {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << std::endl;
+    
+    // Verify RndA matches
+    if (rndA == rndA_verified) {
+        std::cout << "✅ AUTHENTICATION SUCCESSFUL! RndA matches!" << std::endl;
+        Log("DESFire authentication succeeded\n");
+        
+        // Store session data
+        sessionValid_ = true;
+        currentKeyType_ = KeyType;
+        currentKeyNo_ = keyNo;
+        
+        // Copy RndA and RndB to session storage (pad to 16 bytes for uniform storage)
+        std::copy(rndA.begin(), rndA.end(), sessionRndA_.begin());
+        if constexpr (rndSize < 16) {
+            std::fill(sessionRndA_.begin() + rndSize, sessionRndA_.end(), 0);
+        }
+        
+        std::copy(rndB.begin(), rndB.end(), sessionRndB_.begin());
+        if constexpr (rndSize < 16) {
+            std::fill(sessionRndB_.begin() + rndSize, sessionRndB_.end(), 0);
+        }
+        
+        // Store current key (pad to 24 bytes for uniform storage)
+        std::copy(key.begin(), key.end(), currentKey_.begin());
+        if constexpr (keySize < 24) {
+            std::fill(currentKey_.begin() + keySize, currentKey_.end(), 0);
+        }
+        
+        std::cout << "Session established: " << DesfireKeyTraits<KeyType>::Name << "\n";
+        return true;
+        
+    } else {
+        std::cout << "❌ AUTHENTICATION FAILED! RndA mismatch!" << std::endl;
+        Log("ERROR: Authentication failed - RndA verification mismatch\n");
+        sessionValid_ = false;
+        return false;
+    }
+}
+
+// Explicit template instantiations for supported key types
+template bool MifareDesfireCard::authenticate<DesfireKeyType::DES>(uint8_t, const std::array<uint8_t, DesfireKeyTraits<DesfireKeyType::DES>::KeySize>&);
+template bool MifareDesfireCard::authenticate<DesfireKeyType::DES3_2KEY>(uint8_t, const std::array<uint8_t, DesfireKeyTraits<DesfireKeyType::DES3_2KEY>::KeySize>&);
+template bool MifareDesfireCard::authenticate<DesfireKeyType::DES3_3KEY>(uint8_t, const std::array<uint8_t, DesfireKeyTraits<DesfireKeyType::DES3_3KEY>::KeySize>&);
+template bool MifareDesfireCard::authenticate<DesfireKeyType::AES>(uint8_t, const std::array<uint8_t, DesfireKeyTraits<DesfireKeyType::AES>::KeySize>&);
 
 template<DesfireKeyType NewKeyType>
 bool MifareDesfireCard::changeKey(uint8_t keyNo, const std::array<uint8_t, DesfireKeyTraits<NewKeyType>::KeySize>& newKey) {
@@ -468,19 +821,34 @@ bool MifareDesfireCard::changeKey(uint8_t keyNo, const std::array<uint8_t, Desfi
     // === STEP 3: Build CRC data and calculate CRC16 ===
     std::cout << "\n--- Step 3: Calculate CRC16 ---\n";
     
-    // CRC is calculated over: [0xC4, keyNo, xorKeyData...]
+    // CRC calculation differs based on whether we're changing the currently authenticated key:
+    // - Changing different key: CRC over [0xC4, keyNo, xorKeyData...]
+    // - Changing same key: CRC over [xorKeyData...] ONLY (no command byte, no keyNo)
+    bool changingSameKey = (keyNo == currentKeyNo_);
+    
     std::vector<uint8_t> crcData;
-    crcData.push_back(0xC4);  // ChangeKey command
-    crcData.push_back(keyNo);
-    crcData.insert(crcData.end(), xorKeyData.begin(), xorKeyData.end());
+    
+    if (changingSameKey) {
+        // Same key: CRC only over XOR'd data
+        crcData.insert(crcData.end(), xorKeyData.begin(), xorKeyData.end());
+    } else {
+        // Different key: CRC over command + keyNo + XOR'd data
+        crcData.push_back(0xC4);
+        crcData.push_back(keyNo);
+        crcData.insert(crcData.end(), xorKeyData.begin(), xorKeyData.end());
+    }
     
     uint16_t crc16 = calculateCRC16(crcData.data(), crcData.size());
     
     std::cout << "CRC16 = 0x" << std::hex << std::setw(4) << std::setfill('0') 
-              << crc16 << std::dec << "\n";
+              << crc16 << std::dec << " (changing " << (changingSameKey ? "same" : "different") << " key)\n";
     
     // === STEP 4: Build payload (xorKeyData + CRC16 in little-endian) ===
     std::cout << "\n--- Step 4: Build payload ---\n";
+    
+    // Payload structure:
+    // - Same key: [xorKeyData] || [CRC16] (no keyVersion)
+    // - Different key: [xorKeyData] || [CRC16] (keyVersion sent unencrypted after)
     
     std::vector<uint8_t> payload = xorKeyData;
     payload.push_back(static_cast<uint8_t>(crc16 & 0xFF));        // CRC LSB
@@ -586,7 +954,7 @@ bool MifareDesfireCard::changeKey(uint8_t keyNo, const std::array<uint8_t, Desfi
     // === STEP 7: Build ChangeKey APDU ===
     std::cout << "\n--- Step 7: Build ChangeKey APDU ---\n";
     
-    // Calculate keyVersion byte
+    // Calculate keyVersion byte (only used for different-key changes)
     uint8_t keyVersion = makeKeyVersion(NewKeyType, 0);  // revision 0
     
     std::vector<uint8_t> apdu;
@@ -594,93 +962,112 @@ bool MifareDesfireCard::changeKey(uint8_t keyNo, const std::array<uint8_t, Desfi
     apdu.push_back(0xC4);                              // INS = ChangeKey
     apdu.push_back(0x00);                              // P1
     apdu.push_back(0x00);                              // P2
-    apdu.push_back(encryptedPayload.size() + 2);       // Lc = encrypted + keyNo + keyVersion
+    
+    // Lc calculation differs based on same vs different key:
+    // - Same key: Lc = 1 (keyNo) + encryptedPayload.size() (no keyVersion)
+    // - Different key: Lc = 1 (keyNo) + encryptedPayload.size() + 1 (keyVersion unencrypted)
+    if (changingSameKey) {
+        apdu.push_back(encryptedPayload.size() + 1);   // Lc = keyNo + encrypted (no keyVersion)
+    } else {
+        apdu.push_back(encryptedPayload.size() + 2);   // Lc = keyNo + encrypted + keyVersion
+    }
+    
     apdu.push_back(keyNo);                             // Key number
     apdu.insert(apdu.end(), encryptedPayload.begin(), encryptedPayload.end());
-    apdu.push_back(keyVersion);                        // Key version (NOT encrypted)
+    
+    // For different-key changes, keyVersion is sent unencrypted after the cryptogram
+    if (!changingSameKey) {
+        apdu.push_back(keyVersion);                    // Key version (unencrypted)
+    }
+    
     apdu.push_back(0x00);                              // Le
     
     std::cout << "APDU: ";
     for (auto b : apdu) std::cout << Hex0x(b) << " ";
     std::cout << "\n";
-    std::cout << "  CLA=0x90, INS=0xC4, keyNo=" << int(keyNo) 
-              << ", keyVersion=0x" << std::hex << int(keyVersion) << std::dec << "\n";
     
-    // // === STEP 8: Send command ===
-    // std::cout << "\n--- Step 8: Send ChangeKey command ---\n";
+    if (changingSameKey) {
+        std::cout << "  CLA=0x90, INS=0xC4, keyNo=" << int(keyNo) << " (same-key, no keyVersion)\n";
+    } else {
+        std::cout << "  CLA=0x90, INS=0xC4, keyNo=" << int(keyNo) 
+                  << ", keyVersion=0x" << std::hex << int(keyVersion) << std::dec << "\n";
+    }
     
-    // using namespace NFC_Controller::Cpp;
+    // === STEP 8: Send command ===
+    std::cout << "\n--- Step 8: Send ChangeKey command ---\n";
+    
+    using namespace NFC_Controller::Cpp;
 
-    // InDataExchangeCommand::Options opts;
-    // opts.payload = apdu;
-    // opts.responseTimeoutMs = 2000;
-    // auto command = InDataExchangeCommand(opts);
+    InDataExchangeCommand::Options opts;
+    opts.payload = apdu;
+    opts.responseTimeoutMs = 2000;
+    auto command = InDataExchangeCommand(opts);
     
-    // auto result = nfc_->executeCommand(command);
+    auto result = nfc_->executeCommand(command);
     
-    // if (result.status != pn532Response::statusCode::OK) {
-    //     Log("ERROR: ChangeKey failed with PN532 status: " + std::to_string(static_cast<int>(result.status)) + "\n");
-    //     std::cout << "❌ PN532 communication error\n";
-    //     return false;
-    // }
+    if (result.status != pn532Response::statusCode::OK) {
+        Log("ERROR: ChangeKey failed with PN532 status: " + std::to_string(static_cast<int>(result.status)) + "\n");
+        std::cout << "❌ PN532 communication error\n";
+        return false;
+    }
     
-    // std::cout << "Card response: ";
-    // for (auto byte : result.responsePayload) {
-    //     std::cout << Hex0x(byte) << " ";
-    // }
-    // std::cout << "\n";
+    std::cout << "Card response: ";
+    for (auto byte : result.responsePayload) {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << "\n";
     
-    // // === STEP 9: Parse response ===
-    // if (result.responsePayload.size() < 2) {
-    //     Log("ERROR: ChangeKey response too short\n");
-    //     std::cout << "❌ Invalid response length\n";
-    //     return false;
-    // }
+    // === STEP 9: Parse response ===
+    if (result.responsePayload.size() < 2) {
+        Log("ERROR: ChangeKey response too short\n");
+        std::cout << "❌ Invalid response length\n";
+        return false;
+    }
     
-    // uint8_t sw1 = result.responsePayload[result.responsePayload.size() - 2];
-    // uint8_t sw2 = result.responsePayload[result.responsePayload.size() - 1];
+    uint8_t sw1 = result.responsePayload[result.responsePayload.size() - 2];
+    uint8_t sw2 = result.responsePayload[result.responsePayload.size() - 1];
     
-    // if (sw1 == 0x91 && sw2 == 0x00) {
-    //     std::cout << "\n!! ChangeKey SUCCESS! Key slot " << int(keyNo) 
-    //               << " now uses " << DesfireKeyTraits<NewKeyType>::Name << "\n";
+    if (sw1 == 0x91 && sw2 == 0x00) {
+        std::cout << "\n!! ChangeKey SUCCESS! Key slot " << int(keyNo) 
+                  << " now uses " << DesfireKeyTraits<NewKeyType>::Name << "\n";
         
-    //     std::cout << "New Key: ";
-    //     for (auto b : newKey) std::cout << Hex0x(b) << " ";
-    //     std::cout << "\n";
+        std::cout << "New Key: ";
+        for (auto b : newKey) std::cout << Hex0x(b) << " ";
+        std::cout << "\n";
 
-    //     Log("ChangeKey succeeded for key #" + std::to_string(keyNo) + "\n");
+        Log("ChangeKey succeeded for key #" + std::to_string(keyNo) + "\n");
         
-    //     // Update stored current key and type
-    //     std::copy(newKey.begin(), newKey.end(), currentKey_.begin());
-    //     currentKeyType_ = NewKeyType;
+        // Update stored current key and type
+        std::copy(newKey.begin(), newKey.end(), currentKey_.begin());
+        currentKeyType_ = NewKeyType;
         
-    //     // Invalidate session (DESFire spec: session ends after ChangeKey)
-    //     sessionValid_ = false;
-    //     std::cout << " Session invalidated (re-authenticate required)\n";
+        // Invalidate session (DESFire spec: session ends after ChangeKey)
+        sessionValid_ = false;
+        std::cout << " Session invalidated (re-authenticate required)\n";
         
-    //     return true;
+        return true;
         
-    // } else if (sw1 == 0x91 && sw2 == 0xAE) {
-    //     Log("ERROR: ChangeKey authentication error (wrong CRC or session key)\n");
-    //     std::cout << "❌ Authentication error (0x91 0xAE): check CRC/session key\n";
-    //     sessionValid_ = false;
-    //     return false;
+    } else if (sw1 == 0x91 && sw2 == 0xAE) {
+        Log("ERROR: ChangeKey authentication error (wrong CRC or session key)\n");
+        std::cout << "❌ Authentication error (0x91 0xAE): check CRC/session key\n";
+        sessionValid_ = false;
+        return false;
         
-    // } else {
-    //     Log("ERROR: ChangeKey failed with status 0x" + std::to_string(sw1) + " 0x" + std::to_string(sw2) + "\n");
-    //     std::cout << "❌ Card error: SW1=0x" << std::hex << int(sw1) 
-    //               << " SW2=0x" << int(sw2) << std::dec << "\n";
-    //     sessionValid_ = false;
-    //     return false;
-    // }
-    // return false;
+    } else {
+        Log("ERROR: ChangeKey failed with status 0x" + std::to_string(sw1) + " 0x" + std::to_string(sw2) + "\n");
+        std::cout << "❌ Card error: SW1=0x" << std::hex << int(sw1) 
+                  << " SW2=0x" << int(sw2) << std::dec << "\n";
+        sessionValid_ = false;
+        return false;
+    }
+    return false;
 }
 
 // Explicit template instantiations for supported key types
-template bool MifareDesfireCard::changeKey<DesfireKeyType::DES>(uint8_t, const std::array<uint8_t, 8>&);
-template bool MifareDesfireCard::changeKey<DesfireKeyType::DES3_2KEY>(uint8_t, const std::array<uint8_t, 16>&);
-template bool MifareDesfireCard::changeKey<DesfireKeyType::DES3_3KEY>(uint8_t, const std::array<uint8_t, 24>&);
-template bool MifareDesfireCard::changeKey<DesfireKeyType::AES>(uint8_t, const std::array<uint8_t, 16>&);
+template bool MifareDesfireCard::changeKey<DesfireKeyType::DES>(uint8_t, const std::array<uint8_t, DesfireKeyTraits<DesfireKeyType::DES>::KeySize>&);
+template bool MifareDesfireCard::changeKey<DesfireKeyType::DES3_2KEY>(uint8_t, const std::array<uint8_t, DesfireKeyTraits<DesfireKeyType::DES3_2KEY>::KeySize>&);
+template bool MifareDesfireCard::changeKey<DesfireKeyType::DES3_3KEY>(uint8_t, const std::array<uint8_t, DesfireKeyTraits<DesfireKeyType::DES3_3KEY>::KeySize>&);
+template bool MifareDesfireCard::changeKey<DesfireKeyType::AES>(uint8_t, const std::array<uint8_t, DesfireKeyTraits<DesfireKeyType::AES>::KeySize>&);
 
 void MifareDesfireCard::authenticateAES(uint8_t keyNo, const std::array<uint8_t, 16> &RndB)
 {

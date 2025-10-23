@@ -127,7 +127,13 @@ public:
     virtual void readData(uint8_t fileNo, std::vector<uint8_t>& outData) {}
     virtual void writeData(uint8_t fileNo, const std::vector<uint8_t>& data) {}
 
+    // Template authenticate function - automatically deduces key size from KeyType
+    template<DesfireKeyType KeyType>
+    bool authenticate(uint8_t keyNo, const std::array<uint8_t, DesfireKeyTraits<KeyType>::KeySize>& key);
+    
+    // Legacy non-template authenticate (uses factory default 3DES key on key slot 0)
     virtual void authenticate();
+    
     virtual void authenticateAES(uint8_t keyNo, const std::array<uint8_t, 16>& RndB);
     
     // Get version information from the card via InDataExchange
@@ -149,6 +155,7 @@ protected:
     // Session state for authenticated operations (needed for ChangeKey)
     bool sessionValid_;                           // Is there an active authenticated session?
     DesfireKeyType currentKeyType_;               // Type of key used in current session
+    uint8_t currentKeyNo_;                        // Key number used in current session
     std::array<uint8_t, 16> sessionRndA_;         // RndA from last authentication (max 16 for AES)
     std::array<uint8_t, 16> sessionRndB_;         // RndB from last authentication (max 16 for AES)
     std::array<uint8_t, 24> currentKey_;          // Current key used for auth (max 24 for 3-key 3DES)

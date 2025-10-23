@@ -132,7 +132,7 @@ def encrypt_aes_cbc(data, key, iv=None):
 # ChangeKey Payload Builder
 # ============================================================================
 
-def build_changekey_payload(old_key_type, new_key_type, old_key, new_key, key_no=0):
+def build_changekey_payload(old_key_type, new_key_type, old_key, new_key, key_no=0, authenticated_key_no=0):
     """
     Build the complete ChangeKey payload
     
@@ -141,10 +141,11 @@ def build_changekey_payload(old_key_type, new_key_type, old_key, new_key, key_no
         new_key_type: String - 'DES', '3DES_2KEY', '3DES_3KEY', 'AES'
         old_key: bytes - Current key (length depends on old_key_type)
         new_key: bytes - New key to install (length depends on new_key_type)
-        key_no: int - Key slot number (0-13)
+        key_no: int - Key slot number to change (0-13)
+        authenticated_key_no: int - Key number used during authentication (default 0)
     
     Returns:
-        dict with 'plaintext', 'padded_plaintext', 'crc16', 'xor_data'
+        dict with 'plaintext', 'padded_plaintext', 'crc16', 'xor_data', 'changing_same_key'
     """
     old_info = KEY_TYPES[old_key_type]
     new_info = KEY_TYPES[new_key_type]
@@ -165,11 +166,25 @@ def build_changekey_payload(old_key_type, new_key_type, old_key, new_key, key_no
                                             old_key_padded[:new_info['size']]))
     
     # Step 2: Calculate CRC16
-    crc_input = bytes([0xC4, key_no]) + xor_data
+    # CRC calculation differs based on whether we're changing the currently authenticated key:
+    # - Changing different key: CRC over [0xC4, keyNo, xorKeyData...]
+    # - Changing same key: CRC over [xorKeyData...] ONLY (no command byte, no keyNo)
+    changing_same_key = (key_no == authenticated_key_no)
+    
+    if changing_same_key:
+        # Same key: CRC only over XOR'd data
+        crc_input = xor_data
+    else:
+        # Different key: CRC over command + keyNo + XOR'd data
+        crc_input = bytes([0xC4, key_no]) + xor_data
+    
     crc16 = calculate_crc16(crc_input)
     crc_bytes = struct.pack('<H', crc16)  # Little-endian
     
     # Step 3: Build plaintext payload
+    # Payload structure:
+    # - Same key: xorData || CRC (no keyVersion)
+    # - Different key: xorData || CRC (keyVersion sent unencrypted after)
     plaintext = xor_data + crc_bytes
     
     # Step 4: Pad to block size (depends on current key type for encryption)
@@ -183,6 +198,7 @@ def build_changekey_payload(old_key_type, new_key_type, old_key, new_key, key_no
         'crc16': crc16,
         'xor_data': xor_data,
         'block_size': block_size,
+        'changing_same_key': changing_same_key,
     }
 
 def encrypt_changekey_payload(payload_data, old_key_type, session_key):
@@ -244,7 +260,7 @@ def build_changekey_apdu(encrypted_payload, new_key_type, key_no=0, key_revision
 # ============================================================================
 
 def simulate_changekey(old_key_type, new_key_type, old_key, new_key, 
-                       rnd_a, rnd_b, key_no=0, key_revision=0):
+                       rnd_a, rnd_b, key_no=0, key_revision=0, authenticated_key_no=0):
     """
     Complete simulation of ChangeKey process
     
@@ -255,8 +271,9 @@ def simulate_changekey(old_key_type, new_key_type, old_key, new_key,
         new_key: bytes - new key to install
         rnd_a: bytes - RndA from authentication (8 or 16 bytes)
         rnd_b: bytes - RndB from authentication (8 or 16 bytes)
-        key_no: int - key slot number
+        key_no: int - key slot number to change
         key_revision: int - key revision number
+        authenticated_key_no: int - key number used during authentication (default 0)
     
     Returns:
         dict with all intermediate values and final APDU
@@ -266,7 +283,8 @@ def simulate_changekey(old_key_type, new_key_type, old_key, new_key,
     print("=" * 80)
     
     print(f"\nKey Transition: {old_key_type} → {new_key_type}")
-    print(f"Key Slot: {key_no}")
+    print(f"Key Slot to Change: {key_no}")
+    print(f"Authenticated Key: {authenticated_key_no}")
     print(f"Key Revision: {key_revision}")
     
     # Step 1: Derive session key
@@ -285,12 +303,12 @@ def simulate_changekey(old_key_type, new_key_type, old_key, new_key,
     # Step 2: Build payload
     print("\n--- Step 2: Build Payload ---")
     payload_data = build_changekey_payload(old_key_type, new_key_type, 
-                                           old_key, new_key, key_no)
+                                           old_key, new_key, key_no, authenticated_key_no)
     
     print(f"Old Key ({old_key_type}): {old_key.hex(' ')}")
     print(f"New Key ({new_key_type}): {new_key.hex(' ')}")
     print(f"XOR Data: {payload_data['xor_data'].hex(' ')}")
-    print(f"CRC16: 0x{payload_data['crc16']:04x}")
+    print(f"CRC16: 0x{payload_data['crc16']:04x} (changing {'same' if payload_data['changing_same_key'] else 'different'} key)")
     print(f"Plaintext ({len(payload_data['plaintext'])} bytes): {payload_data['plaintext'].hex(' ')}")
     print(f"Padded ({len(payload_data['padded_plaintext'])} bytes): {payload_data['padded_plaintext'].hex(' ')}")
     
@@ -392,11 +410,13 @@ def interactive_menu():
             rnd_b = bytes.fromhex(input().replace(' ', ''))
         
         # Key number
-        key_no = int(input("\nKey slot number (0-13, default 0): ") or "0")
+        key_no = int(input("\nKey slot number to change (0-13, default 0): ") or "0")
+        authenticated_key_no = int(input("Authenticated key number (0-13, default 0): ") or "0")
         
         # Run simulation
         result = simulate_changekey(old_key_type, new_key_type, old_key, new_key,
-                                    rnd_a, rnd_b, key_no=key_no)
+                                    rnd_a, rnd_b, key_no=key_no, 
+                                    authenticated_key_no=authenticated_key_no)
         
         print("\n" + "=" * 80)
         print("✅ Simulation Complete!")
@@ -423,20 +443,36 @@ if __name__ == "__main__":
     
     # Example: Test with realistic random values (3DES → AES)
     if len(sys.argv) > 1 and sys.argv[1] == '--example':
-        print("Running example: 3DES_2KEY → AES (factory default → new AES key)")
+        print("Running example: 3DES_2KEY → 3DES_2KEY (changing same key - key 0)")
         simulate_changekey(
             old_key_type='3DES_2KEY',
-            new_key_type='AES',
+            new_key_type='3DES_2KEY',
             old_key=b'\x00' * 16,  # Factory default
             new_key=b'\x00' * 16,  # New key (all-zero for demo)
-            rnd_a=b'\xf0\x6d\xf8\xe4\xed\x3f\xf3\xd0',  # Example RndA from authentication
-            rnd_b=b'\x59\x95\xe1\x7b\x55\x46\xcf\x8f',  # Example RndB from authentication
+            rnd_a=b'\x0f\x39\xfa\x75\x58\xed\x2c\x05',  # Example RndA from authentication
+            rnd_b=b'\xd2\x73\xd6\xfa\x42\x2a\x74\x7e',  # Example RndB from authentication
             key_no=0,
-            key_revision=0
+            key_revision=0,
+            authenticated_key_no=0  # Authenticated with key 0, changing key 0 (same key)
         )
     else:
         # Interactive mode
         interactive_menu()
 
+# 3DES2 -> AES
 # 0x49 0xba 0xc3 0xc2 0x4d 0xb7 0xf0 0x10 0x4d 0xb0 0xc4 0xa7 0xb7 0x47 0x55 0xbd 0xb2 0x16 0x52 0xef 0x42 0xc9 0x08 0xab
 # 0x49 0xba 0xc3 0xc2 0x4d 0xb7 0xf0 0x10 0x4d 0xb0 0xc4 0xa7 0xb7 0x47 0x55 0xbd 0xb2 0x16 0x52 0xef 0x42 0xc9 0x08 0xab
+
+# 3DES2 -> 3DES3
+# 0x37 0x65 0x9b 0x19 0x2c 0x9e 0xbb 0xc9 0xaa 0x43 0xec 0x72 0x12 0x54 0xb6 0x07 0x87 0xfa 0x14 0xe5 0x42 0xac 0x79 0xd6 0xe9 0xaa 0xe9 0xd3 0xb7 0xf7 0x8f 0x7d
+# 0x37 0x65 0x9b 0x19 0x2c 0x9e 0xbb 0xc9 0xaa 0x43 0xec 0x72 0x12 0x54 0xb6 0x07 0x87 0xfa 0x14 0xe5 0x42 0xac 0x79 0xd6 0xe9 0xaa 0xe9 0xd3 0xb7 0xf7 0x8f 0x7d
+
+# 3DES2 -> 3DES2
+# 0x56 0x0a 0x40 0xd7 0x15 0x9d 0x17 0x59 0x44 0x47 0xce 0x70 0xcc 0x44 0x44 0x96 0x93 0xbb 0x8c 0xda 0x9d 0x72 0xad 0x8d
+# 0x56 0x0a 0x40 0xd7 0x15 0x9d 0x17 0x59 0x44 0x47 0xce 0x70 0xcc 0x44 0x44 0x96 0x93 0xbb 0x8c 0xda 0x9d 0x72 0xad 0x8d
+
+
+
+
+# 96 2b 86 38 28 1f b8 3a 98 00 1c 1e e0 22 b5 87 bc e1 92 a7 60 32 25 40 e5 05 3b e8 1b 58 22 e1 7f f2 0a 6e 2e 79 b4 08
+# 96 2b 86 38 28 1f b8 3a 98 00 1c 1e e0 22 b5 87 bc e1 92 a7 60 32 25 40 e5 05 3b e8 1b 58 22 e1 7f f2 0a 6e 2e 79 b4 08
