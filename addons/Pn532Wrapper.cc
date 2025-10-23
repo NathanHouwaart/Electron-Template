@@ -12,6 +12,7 @@
 #include "PN532_Controller/Headers/Commands/getFirmwareVersion.h"
 #include "PN532_Controller/Headers/Commands/performSelfTestCommand.h"
 #include "PN532_Controller/Headers/Commands/inListPassiveTarget.h"
+#include "PN532_Controller/Headers/Cards/KeyVersion.h"
 
 using namespace Napi;
 
@@ -230,7 +231,16 @@ Napi::Value PN532_Wrapper::GetVersion(const Napi::CallbackInfo &info)
         //               << int(info.softwareInfo.swMinorVersion) << std::endl;
         // }
         uint8_t keyVersion = 0;
-        df->getKeyVersion(0x00, keyVersion);
+        if(!df->getKeyVersion(0x00, keyVersion)) {
+            Napi::Error::New(env, "Failed to get key version")
+                .ThrowAsJavaScriptException();
+            return Napi::Boolean::New(env, false);
+        }
+        auto algo = desfire::keyVersionGetAlgo(keyVersion);
+        auto rev = desfire::keyVersionGetRevision(keyVersion);
+        std::cout << "Key 0 ver=0x" << std::hex << int(keyVersion) << std::dec
+                  << " algo=" << desfire::keyAlgoToString(algo)
+                  << " rev=" << int(rev) << "\n";
 
         std::cout << "Key version for key 0: " << Hex0x(keyVersion) << "\n";
 

@@ -398,6 +398,35 @@ void MifareDesfireCard::authenticate(){
     return;
 }
 
+template<DesfireKeyType NewKeyType>
+bool MifareDesfireCard::changeKey(uint8_t keyNo, const std::array<uint8_t, DesfireKeyTraits<NewKeyType>::KeySize>& newKey) {
+        constexpr size_t keySize = DesfireKeyTraits<NewKeyType>::KeySize;
+        
+        Log("Changing key #" + std::to_string(keyNo) + " to " + 
+            std::string(DesfireKeyTraits<NewKeyType>::Name) + "\n");
+        
+        // ChangeKey command format (simplified - actual requires encryption):
+        // CLA INS P1 P2 Lc [keyNo] [keyVersion] [newKey encrypted] Le
+        
+        std::vector<uint8_t> cmd;
+        cmd.push_back(0x90);           // CLA
+        cmd.push_back(0xC4);           // INS = ChangeKey
+        cmd.push_back(0x00);           // P1
+        cmd.push_back(0x00);           // P2
+        
+        // For now, this is SIMPLIFIED - actual ChangeKey requires:
+        // 1. XOR new key with old key
+        // 2. Encrypt the XORed result
+        // 3. Add CRC
+        // This is complex! Let me show basic structure first
+        
+        std::cout << "Key type: " << DesfireKeyTraits<NewKeyType>::Name 
+                  << " (" << keySize << " bytes)" << std::endl;
+        
+        // TODO: Implement full ChangeKey crypto
+        return false; // Not implemented yet
+    }
+
 void MifareDesfireCard::authenticateAES(uint8_t keyNo, const std::array<uint8_t, 16> &RndB)
 {
     Log("Executing DESFire AuthenticateAES command via InDataExchange on keyNo " + std::to_string(keyNo) + "\n");

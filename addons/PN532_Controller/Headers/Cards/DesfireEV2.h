@@ -22,7 +22,6 @@ public:
     // EV2 new features
     virtual bool authenticateEV2(uint8_t keyNo, const std::vector<uint8_t>& key) { return false; }
     virtual bool createBackupFile(uint8_t fileNo, uint16_t size) { return false; }
-    virtual bool getKeyVersion(uint8_t keyNo, uint8_t& version) const { return false; }
 
     // Transaction MAC (integrity)
     virtual bool enableTransactionMAC(bool enable = true) { return false; }

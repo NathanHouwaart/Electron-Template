@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstring>
 #include <iostream>
+#include <KeyTraits.h>
 
 // Forward declaration
 namespace NFC_Controller {
@@ -97,6 +98,8 @@ __attribute__((packed))
 #pragma pack(pop)
 #endif
 
+using namespace desfire;
+
 // Verify the packed structure size matches expected DESFire response (7+7+14 = 28 bytes)
 static_assert(sizeof(DesfireVersionInfo) == 28, "DesfireVersionInfo must be 28 bytes (packed)");
 
@@ -125,7 +128,10 @@ public:
     virtual bool getVersion(DesfireVersionInfo& versionInfo);
 
     virtual bool getKeyVersion(uint8_t keyNo, uint8_t& keyVersion);
-    
+
+    template<DesfireKeyType NewKeyType>
+    bool changeKey(uint8_t keyNo, const std::array<uint8_t, DesfireKeyTraits<NewKeyType>::KeySize>& newKey);
+
     // Get the DESFire variant type (0 = unknown, 1 = EV1, 2 = EV2, 3 = EV3)
     virtual uint8_t getDesfireVariant();
 
