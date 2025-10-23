@@ -5,7 +5,9 @@
 #include <vector>
 #include <cstring>
 #include <iostream>
-#include <KeyTraits.h>
+#include <array>
+#include "KeyVersion.h"
+#include "KeyTraits.h"
 
 // Forward declaration
 namespace NFC_Controller {
@@ -109,8 +111,12 @@ std::ostream& operator<<(std::ostream& os, const DesfireVersionInfo& v);
 class MifareDesfireCard : public Card {
 public:
     MifareDesfireCard(TargetInfo id, NFC_Controller::Cpp::PN532_chip* nfc = nullptr)
-        : Card(std::move(id)), nfc_(nfc), versionRetrieved_(false) {
+        : Card(std::move(id)), nfc_(nfc), versionRetrieved_(false), 
+          sessionValid_(false), currentKeyType_(DesfireKeyType::UNKNOWN) {
         std::memset(&versionInfo_, 0, sizeof(versionInfo_));
+        sessionRndA_.fill(0);
+        sessionRndB_.fill(0);
+        currentKey_.fill(0);
     }
 
     virtual std::string prettyType() const override {
@@ -139,6 +145,13 @@ protected:
     NFC_Controller::Cpp::PN532_chip* nfc_;
     DesfireVersionInfo versionInfo_;
     bool versionRetrieved_;
+    
+    // Session state for authenticated operations (needed for ChangeKey)
+    bool sessionValid_;                           // Is there an active authenticated session?
+    DesfireKeyType currentKeyType_;               // Type of key used in current session
+    std::array<uint8_t, 16> sessionRndA_;         // RndA from last authentication (max 16 for AES)
+    std::array<uint8_t, 16> sessionRndB_;         // RndB from last authentication (max 16 for AES)
+    std::array<uint8_t, 24> currentKey_;          // Current key used for auth (max 24 for 3-key 3DES)
     
     // Helper to parse version response frames
     bool parseVersionFrame(const uint8_t* data, uint8_t responseSize, uint8_t frameIndex);
