@@ -229,9 +229,15 @@ Napi::Value PN532_Wrapper::GetVersion(const Napi::CallbackInfo &info)
         //               << int(info.softwareInfo.swMajorVersion) << "."
         //               << int(info.softwareInfo.swMinorVersion) << std::endl;
         // }
+        uint8_t keyVersion = 0;
+        df->getKeyVersion(0x00, keyVersion);
+
+        std::cout << "Key version for key 0: " << Hex0x(keyVersion) << "\n";
+
         Sleep(1000);
         std::array<uint8_t, 16> RndB = {};
         // df->authenticateAES(0x00, RndB);            // Authenticate with key 0 on AES
+        
         df->authenticate();
 
         return Napi::Boolean::New(env, true);

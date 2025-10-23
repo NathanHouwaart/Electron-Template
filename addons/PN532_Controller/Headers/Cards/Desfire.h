@@ -123,6 +123,8 @@ public:
     
     // Get version information from the card via InDataExchange
     virtual bool getVersion(DesfireVersionInfo& versionInfo);
+
+    virtual bool getKeyVersion(uint8_t keyNo, uint8_t& keyVersion);
     
     // Get the DESFire variant type (0 = unknown, 1 = EV1, 2 = EV2, 3 = EV3)
     virtual uint8_t getDesfireVariant();

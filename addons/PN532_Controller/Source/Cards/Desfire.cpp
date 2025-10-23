@@ -538,6 +538,45 @@ bool MifareDesfireCard::getVersion(DesfireVersionInfo &versionInfo)
     return true;
 }
 
+// Returns true on success and fills 'version'
+bool MifareDesfireCard::getKeyVersion(uint8_t keyNo, uint8_t &version)
+{
+    using namespace NFC_Controller::Cpp;
+
+    // Build DESFire APDU: GetKeyVersion for keyNo
+    uint8_t apdu[] = { 0x90, 0x64, 0x00, 0x00, 0x01, keyNo, 0x00 };
+
+    auto command = InDataExchangeCommand(
+        InDataExchangeCommand::Options{
+            .payload = std::vector<uint8_t>(apdu, apdu + sizeof(apdu)),
+            .responseTimeoutMs = 2000
+    });
+
+    auto result = nfc_->executeCommand(command);
+
+    if (result.status != pn532Response::statusCode::OK) {
+        Log("ERROR: getKeyVersion PN532 transport failure: " + std::to_string(static_cast<int>(result.status)) + "\n");
+        return false;
+    }
+
+    // Now check card-level status using the InDataExchange parser helpers if available
+    // If you have access to the command instance after execution, use command.getStatus/getResponseData
+    // But result.responsePayload contains the data bytes returned by the card
+    if (result.responsePayload.empty()) {
+        Log("ERROR: getKeyVersion returned empty payload\n");
+        return false;
+    }
+
+    // Last two bytes of the card's low-level payload are status bytes; your InDataExchangeCommand
+    // already strips the transport status byte and leaves card data in responsePayload.
+    // In practice responsePayload should contain the keyVersion byte (single byte).
+    version = result.responsePayload[0];
+
+    std::cout << "GetKeyVersion(keyNo=" << int(keyNo) << ") = 0x" << std::hex << int(version) << std::dec << "\n";
+
+    return true;
+}
+
 uint8_t MifareDesfireCard::getDesfireVariant()
 {
     if (!versionRetrieved_)
