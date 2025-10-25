@@ -131,8 +131,7 @@ public:
     template<DesfireKeyType KeyType>
     bool authenticate(uint8_t keyNo, const std::array<uint8_t, DesfireKeyTraits<KeyType>::KeySize>& key);
     
-    // Legacy non-template authenticate (uses factory default 3DES key on key slot 0)
-    virtual void authenticate();
+
     
     virtual void authenticateAES(uint8_t keyNo, const std::array<uint8_t, 16>& RndB);
     
@@ -158,6 +157,7 @@ protected:
     uint8_t currentKeyNo_;                        // Key number used in current session
     std::array<uint8_t, 16> sessionRndA_;         // RndA from last authentication (max 16 for AES)
     std::array<uint8_t, 16> sessionRndB_;         // RndB from last authentication (max 16 for AES)
+    std::vector<uint8_t>    sessionKey_;          // Session key derived from RndA and RndB (max 24 for 3-key 3DES)
     std::array<uint8_t, 24> currentKey_;          // Current key used for auth (max 24 for 3-key 3DES)
     
     // Helper to parse version response frames
