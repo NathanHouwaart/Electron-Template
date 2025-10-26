@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 7.3.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon.ico">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon.ico">
+  <link rel="mask-icon" href="/images/favicon.ico" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.2/css/all.min.css" integrity="sha256-xejo6yLi6vGtAjcMIsY8BHdKsLg7QynVlFMzdQgUuy8=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"www.geekyuan.cn","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.12.3","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12},"copycode":{"enable":false,"style":null},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="调试使用的卡片为desfire ev1 2k，使用第一代desfire卡片d40 datasheet，ISO 7816-4 APDU 封装原生DESFire命令。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Desfire卡片基础命令调试">
+<meta property="og:url" content="https://www.geekyuan.cn/post/6d83a629.html">
+<meta property="og:site_name" content="极客原力">
+<meta property="og:description" content="调试使用的卡片为desfire ev1 2k，使用第一代desfire卡片d40 datasheet，ISO 7816-4 APDU 封装原生DESFire命令。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/CBC%E6%8E%A5%E6%94%B6%E6%A8%A1%E5%BC%8F.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/CBC%E5%8F%91%E9%80%81%E6%A8%A1%E5%BC%8F.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E9%80%9A%E4%BF%A1%E8%AE%BE%E7%BD%AE%E4%BB%A3%E7%A0%81.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E8%AE%BF%E9%97%AE%E6%9D%83%E9%99%90.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E7%8A%B6%E6%80%81%E5%92%8C%E9%94%99%E8%AF%AF%E4%BB%A3%E7%A0%81.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E8%AE%A4%E8%AF%81.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E4%BF%AE%E6%94%B9%E5%AF%86%E9%92%A5%E8%AE%BE%E7%BD%AE.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/PICC%E4%B8%BB%E5%AF%86%E9%92%A5%E8%AE%BE%E7%BD%AE.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/PICC%E4%B8%BB%E5%AF%86%E9%92%A5%E8%AE%BE%E7%BD%AE2.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E5%BA%94%E7%94%A8%E4%B8%BB%E5%AF%86%E9%92%A5%E8%AE%BE%E7%BD%AE.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E5%BA%94%E7%94%A8%E4%B8%BB%E5%AF%86%E9%92%A5%E8%AE%BE%E7%BD%AE2.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E8%8E%B7%E5%8F%96%E5%AF%86%E9%92%A5%E8%AE%BE%E7%BD%AE.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E4%BF%AE%E6%94%B9%E5%AF%86%E9%92%A5.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E8%8E%B7%E5%8F%96%E5%AF%86%E9%92%A5%E7%89%88%E6%9C%AC.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E5%BB%BA%E7%AB%8B%E5%BA%94%E7%94%A8.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E5%88%A0%E9%99%A4%E5%BA%94%E7%94%A8.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E8%8E%B7%E5%8F%96%E5%BA%94%E7%94%A8%E6%A0%87%E8%AF%86%E7%AC%A6.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E9%80%89%E6%8B%A9%E5%BA%94%E7%94%A8.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E6%A0%BC%E5%BC%8F%E5%8C%96PICC.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E8%8E%B7%E5%8F%96%E7%89%88%E6%9C%AC.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E8%8E%B7%E5%8F%96%E6%96%87%E4%BB%B6ID.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E8%8E%B7%E5%8F%96%E6%96%87%E4%BB%B6%E8%AE%BE%E7%BD%AE.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E4%BF%AE%E6%94%B9%E6%96%87%E4%BB%B6%E8%AE%BE%E7%BD%AE.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E5%BB%BA%E7%AB%8B%E6%A0%87%E5%87%86%E6%95%B0%E6%8D%AE%E6%96%87%E4%BB%B6.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E5%BB%BA%E7%AB%8B%E5%A4%87%E4%BB%BD%E6%95%B0%E6%8D%AE%E6%96%87%E4%BB%B6.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E5%BB%BA%E7%AB%8B%E5%80%BC%E6%96%87%E4%BB%B6.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E5%BB%BA%E7%AB%8B%E7%BA%BF%E6%80%A7%E8%AE%B0%E5%BD%95%E6%96%87%E4%BB%B6.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E5%BB%BA%E7%AB%8B%E5%BE%AA%E7%8E%AF%E8%AE%B0%E5%BD%95%E6%96%87%E4%BB%B6.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E5%88%A0%E9%99%A4%E6%96%87%E4%BB%B6.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E8%AF%BB%E6%95%B0%E6%8D%AE.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E5%86%99%E6%95%B0%E6%8D%AE.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E8%8E%B7%E5%8F%96%E5%80%BC.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E5%9C%88%E5%AD%98.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E6%B6%88%E8%B4%B9.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E6%9C%89%E9%99%90%E5%9C%88%E5%AD%98.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E5%86%99%E8%AE%B0%E5%BD%95.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E8%AF%BB%E8%AE%B0%E5%BD%95.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E6%B8%85%E7%A9%BA%E5%80%BC%E6%96%87%E4%BB%B6.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E6%8F%90%E4%BA%A4%E4%BA%8B%E5%8A%A1.png">
+<meta property="og:image" content="https://www.geekyuan.cn/post/6d83a629/%E4%B8%AD%E6%AD%A2%E4%BA%8B%E5%8A%A1.png">
+<meta property="article:published_time" content="2024-09-12T14:55:38.000Z">
+<meta property="article:modified_time" content="2024-10-01T15:05:05.099Z">
+<meta property="article:author" content="袁维">
+<meta property="article:tag" content="CPU卡">
+<meta property="article:tag" content="非接触式IC卡">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://www.geekyuan.cn/post/6d83a629/CBC%E6%8E%A5%E6%94%B6%E6%A8%A1%E5%BC%8F.png">
+
+
+<link rel="canonical" href="https://www.geekyuan.cn/post/6d83a629.html">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://www.geekyuan.cn/post/6d83a629.html","path":"post/6d83a629.html","title":"Desfire卡片基础命令调试"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Desfire卡片基础命令调试 | 极客原力</title>
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+      <img class="custom-logo-image" src="/images/logo-geekyuan.png" alt="极客原力">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">极客原力</p>
+      <i class="logo-line"></i>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%AE%89%E5%85%A8%E3%80%81%E5%BA%94%E7%94%A8%E5%8F%8A%E6%96%87%E4%BB%B6%E7%9B%B8%E5%85%B3%E5%8A%9F%E8%83%BD%E7%9A%84%E4%BB%A3%E7%A0%81"><span class="nav-number">1.</span> <span class="nav-text">安全、应用及文件相关功能的代码</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E6%96%87%E4%BB%B6%E7%B1%BB%E5%9E%8B%E4%BB%A3%E7%A0%81"><span class="nav-number">1.1.</span> <span class="nav-text">文件类型代码</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E9%80%9A%E4%BF%A1%E8%AE%BE%E7%BD%AE%E4%BB%A3%E7%A0%81-%E5%8A%A0%E5%AF%86%E6%A8%A1%E5%BC%8F"><span class="nav-number">1.2.</span> <span class="nav-text">通信设置代码-加密模式</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E8%AE%BF%E9%97%AE%E6%9D%83%E9%99%90%E4%BB%A3%E7%A0%81"><span class="nav-number">1.3.</span> <span class="nav-text">访问权限代码</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E7%8A%B6%E6%80%81%E5%92%8C%E9%94%99%E8%AF%AF%E4%BB%A3%E7%A0%81"><span class="nav-number">1.4.</span> <span class="nav-text">状态和错误代码</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%AE%89%E5%85%A8%E7%9B%B8%E5%85%B3%E5%91%BD%E4%BB%A4"><span class="nav-number">2.</span> <span class="nav-text">安全相关命令</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#Authenticate%EF%BC%88%E8%AE%A4%E8%AF%81%EF%BC%89"><span class="nav-number">2.1.</span> <span class="nav-text">Authenticate（认证）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#ChangeKeySettings%EF%BC%88%E4%BF%AE%E6%94%B9%E5%AF%86%E9%92%A5%E8%AE%BE%E7%BD%AE%EF%BC%89"><span class="nav-number">2.2.</span> <span class="nav-text">ChangeKeySettings（修改密钥设置）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#GetKeySettings%EF%BC%88%E8%8E%B7%E5%8F%96%E5%AF%86%E9%92%A5%E8%AE%BE%E7%BD%AE%EF%BC%89"><span class="nav-number">2.3.</span> <span class="nav-text">GetKeySettings（获取密钥设置）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#ChangeKey%EF%BC%88%E4%BF%AE%E6%94%B9%E5%AF%86%E9%92%A5%EF%BC%89"><span class="nav-number">2.4.</span> <span class="nav-text">ChangeKey（修改密钥）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#GetKeyVersion%EF%BC%88%E8%8E%B7%E5%8F%96%E5%AF%86%E9%92%A5%E7%89%88%E6%9C%AC%EF%BC%89"><span class="nav-number">2.5.</span> <span class="nav-text">GetKeyVersion（获取密钥版本）</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#PICC%E7%BA%A7%E5%88%AB%E5%91%BD%E4%BB%A4"><span class="nav-number">3.</span> <span class="nav-text">PICC级别命令</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#CreateApplication%EF%BC%88%E5%BB%BA%E7%AB%8B%E5%BA%94%E7%94%A8%EF%BC%89"><span class="nav-number">3.1.</span> <span class="nav-text">CreateApplication（建立应用）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#DeleteApplication%EF%BC%88%E5%88%A0%E9%99%A4%E5%BA%94%E7%94%A8%EF%BC%89"><span class="nav-number">3.2.</span> <span class="nav-text">DeleteApplication（删除应用）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#GetApplicationIDs%EF%BC%88%E8%8E%B7%E5%8F%96%E5%BA%94%E7%94%A8%E6%A0%87%E8%AF%86%E7%AC%A6%EF%BC%8CAID%EF%BC%89"><span class="nav-number">3.3.</span> <span class="nav-text">GetApplicationIDs（获取应用标识符，AID）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#SelectApplication%EF%BC%88%E9%80%89%E6%8B%A9%E5%BA%94%E7%94%A8%EF%BC%89"><span class="nav-number">3.4.</span> <span class="nav-text">SelectApplication（选择应用）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#FormatPICC%EF%BC%88%E6%A0%BC%E5%BC%8F%E5%8C%96PICC%EF%BC%89"><span class="nav-number">3.5.</span> <span class="nav-text">FormatPICC（格式化PICC）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#GetVersion%EF%BC%88%E8%8E%B7%E5%8F%96%E7%89%88%E6%9C%AC%EF%BC%89"><span class="nav-number">3.6.</span> <span class="nav-text">GetVersion（获取版本）</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%BA%94%E7%94%A8%E7%BA%A7%E5%88%AB%E5%91%BD%E4%BB%A4"><span class="nav-number">4.</span> <span class="nav-text">应用级别命令</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#GetFileIDs%EF%BC%88%E8%8E%B7%E5%8F%96%E6%96%87%E4%BB%B6ID%EF%BC%8CFID%EF%BC%89"><span class="nav-number">4.1.</span> <span class="nav-text">GetFileIDs（获取文件ID，FID）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#GetFileSettings%EF%BC%88%E8%8E%B7%E5%8F%96%E6%96%87%E4%BB%B6%E8%AE%BE%E7%BD%AE%EF%BC%89"><span class="nav-number">4.2.</span> <span class="nav-text">GetFileSettings（获取文件设置）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#ChangeFileSettings%EF%BC%88%E4%BF%AE%E6%94%B9%E6%96%87%E4%BB%B6%E8%AE%BE%E7%BD%AE%EF%BC%89"><span class="nav-number">4.3.</span> <span class="nav-text">ChangeFileSettings（修改文件设置）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#CreateStdDataFile%EF%BC%88%E5%BB%BA%E7%AB%8B%E6%A0%87%E5%87%86%E6%95%B0%E6%8D%AE%E6%96%87%E4%BB%B6%EF%BC%89"><span class="nav-number">4.4.</span> <span class="nav-text">CreateStdDataFile（建立标准数据文件）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#CreateBackupDataFile%EF%BC%88%E5%BB%BA%E7%AB%8B%E5%A4%87%E4%BB%BD%E6%95%B0%E6%8D%AE%E6%96%87%E4%BB%B6%EF%BC%89"><span class="nav-number">4.5.</span> <span class="nav-text">CreateBackupDataFile（建立备份数据文件）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#CreateValueFile%EF%BC%88%E5%BB%BA%E7%AB%8B%E5%80%BC%E6%96%87%E4%BB%B6%EF%BC%89"><span class="nav-number">4.6.</span> <span class="nav-text">CreateValueFile（建立值文件）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#CreateLinearRecordFile%EF%BC%88%E5%BB%BA%E7%AB%8B%E7%BA%BF%E6%80%A7%E8%AE%B0%E5%BD%95%E6%96%87%E4%BB%B6%EF%BC%89"><span class="nav-number">4.7.</span> <span class="nav-text">CreateLinearRecordFile（建立线性记录文件）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#CreateCyclicRecordFile%EF%BC%88%E5%BB%BA%E7%AB%8B%E5%BE%AA%E7%8E%AF%E8%AE%B0%E5%BD%95%E6%96%87%E4%BB%B6%EF%BC%89"><span class="nav-number">4.8.</span> <span class="nav-text">CreateCyclicRecordFile（建立循环记录文件）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#DeleteFile%EF%BC%88%E5%88%A0%E9%99%A4%E6%96%87%E4%BB%B6%EF%BC%89"><span class="nav-number">4.9.</span> <span class="nav-text">DeleteFile（删除文件）</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E6%93%8D%E4%BD%9C%E5%91%BD%E4%BB%A4"><span class="nav-number">5.</span> <span class="nav-text">数据操作命令</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#ReadData%EF%BC%88%E8%AF%BB%E6%95%B0%E6%8D%AE%EF%BC%89"><span class="nav-number">5.1.</span> <span class="nav-text">ReadData（读数据）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#WriteData-%EF%BC%88%E5%86%99%E6%95%B0%E6%8D%AE%EF%BC%89"><span class="nav-number">5.2.</span> <span class="nav-text">WriteData （写数据）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#GetValue-%EF%BC%88%E8%8E%B7%E5%8F%96%E5%80%BC%EF%BC%89"><span class="nav-number">5.3.</span> <span class="nav-text">GetValue （获取值）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#Credit-%EF%BC%88%E5%9C%88%E5%AD%98%EF%BC%89"><span class="nav-number">5.4.</span> <span class="nav-text">Credit （圈存）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#Debit%EF%BC%88%E6%B6%88%E8%B4%B9%EF%BC%89"><span class="nav-number">5.5.</span> <span class="nav-text">Debit（消费）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#LimitedCredit%EF%BC%88%E6%9C%89%E9%99%90%E5%9C%88%E5%AD%98%EF%BC%89"><span class="nav-number">5.6.</span> <span class="nav-text">LimitedCredit（有限圈存）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#WriteRecord-%EF%BC%88%E5%86%99%E8%AE%B0%E5%BD%95%EF%BC%89"><span class="nav-number">5.7.</span> <span class="nav-text">WriteRecord （写记录）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#ReadRecords%EF%BC%88%E8%AF%BB%E8%AE%B0%E5%BD%95%EF%BC%89"><span class="nav-number">5.8.</span> <span class="nav-text">ReadRecords（读记录）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#ClearRecordFile%EF%BC%88%E6%B8%85%E7%A9%BA%E5%80%BC%E6%96%87%E4%BB%B6%EF%BC%89"><span class="nav-number">5.9.</span> <span class="nav-text">ClearRecordFile（清空值文件）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#CommitTransaction%EF%BC%88%E6%8F%90%E4%BA%A4%E4%BA%8B%E5%8A%A1%EF%BC%89"><span class="nav-number">5.10.</span> <span class="nav-text">CommitTransaction（提交事务）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#AbortTransaction%EF%BC%88%E4%B8%AD%E6%AD%A2%E4%BA%8B%E5%8A%A1%EF%BC%89"><span class="nav-number">5.11.</span> <span class="nav-text">AbortTransaction（中止事务）</span></a></li></ol></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="袁维"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">袁维</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="/001yuanwei@163.com" title="E-Mail → 001yuanwei@163.com"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://www.geekyuan.cn/post/6d83a629.html">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="袁维">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="极客原力">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Desfire卡片基础命令调试 | 极客原力">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Desfire卡片基础命令调试
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2024-09-12 22:55:38" itemprop="dateCreated datePublished" datetime="2024-09-12T22:55:38+08:00">2024-09-12</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2024-10-01 23:05:05" itemprop="dateModified" datetime="2024-10-01T23:05:05+08:00">2024-10-01</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E5%85%B6%E5%AE%83/" itemprop="url" rel="index"><span itemprop="name">其它</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E5%85%B6%E5%AE%83/%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">笔记</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E5%85%B6%E5%AE%83/%E7%AC%94%E8%AE%B0/IC%E5%8D%A1/" itemprop="url" rel="index"><span itemprop="name">IC卡</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E5%85%B6%E5%AE%83/%E7%AC%94%E8%AE%B0/IC%E5%8D%A1/%E9%9D%9E%E6%8E%A5%E8%A7%A6%E5%BC%8FIC%E5%8D%A1/" itemprop="url" rel="index"><span itemprop="name">非接触式IC卡</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E5%85%B6%E5%AE%83/%E7%AC%94%E8%AE%B0/IC%E5%8D%A1/%E9%9D%9E%E6%8E%A5%E8%A7%A6%E5%BC%8FIC%E5%8D%A1/CPU%E5%8D%A1/" itemprop="url" rel="index"><span itemprop="name">CPU卡</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>调试使用的卡片为desfire ev1 2k，使用第一代desfire卡片d40 datasheet，ISO 7816-4 APDU 封装原生DESFire命令。</p>
+<span id="more"></span>
+<p>desfire卡片3DES算法使用CBC模式加密&#x2F;解密，卡片（PICC）总是执行加密（ek），读卡器（PCD）总是执行解密（dk）。</p>
+<p>desfire卡片3DES算法使用CBC模式计算MAC，卡片（PICC）总是执行加密（ek），读卡器（PCD）执行加密（ek），取最后一组密文前4个字节作为MAC。</p>
+<p>发送数据使用CBC发送模式，接收数据使用CBC接收模式。</p>
+<img src="/post/6d83a629/CBC%E6%8E%A5%E6%94%B6%E6%A8%A1%E5%BC%8F.png" class="">
+
+<img src="/post/6d83a629/CBC%E5%8F%91%E9%80%81%E6%A8%A1%E5%BC%8F.png" class="">
+
+<p><strong>注：图中初始iv为0x0000000000000000，加密&#x2F;解密使用DESede ECB模式，每个输入&#x2F;输出块为8字节大小。</strong></p>
+<p>例：desfire卡片DES CBC解密，解密算法如下：<br>key：00 11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF<br>原始数据：01 02 03 04 05 06 07 08 11 22 33 44 55 66 77 88 88 77 66 55 44 33 22 11</p>
+<p>原始数据分成三组：<br>第一组：01 02 03 04 05 06 07 08<br>第二组：11 22 33 44 55 66 77 88<br>第三组：88 77 66 55 44 33 22 11</p>
+<p>dk(第一组) &#x3D; dk(01 02 03 04 05 06 07 08) &#x3D; D9 16 AA 29 EF 0A 8F 6A<br>dk(第二组) &#x3D; dk(dk(第一组) XOR 11 22 33 44 55 66 77 88) &#x3D; dk(C834996DBA6CF8E2) &#x3D; F3 70 33 AD 1C A0 6F A9<br>dk(第三组) &#x3D; dk(dk(第二组) XOR 88 77 66 55 44 33 22 11) &#x3D; dk(7B0755F858934DB8) &#x3D; 14 A3 08 40 F5 24 35 E4 </p>
+<p>解密数据：D9 16 AA 29 EF 0A 8F 6A F3 70 33 AD 1C A0 6F A9 14 A3 08 40 F5 24 35 E4 </p>
+<h4 id="安全、应用及文件相关功能的代码"><a href="#安全、应用及文件相关功能的代码" class="headerlink" title="安全、应用及文件相关功能的代码"></a>安全、应用及文件相关功能的代码</h4><h5 id="文件类型代码"><a href="#文件类型代码" class="headerlink" title="文件类型代码"></a>文件类型代码</h5><p>应用内的文件可为下列不同类型：</p>
+<ul>
+<li>标准数据文件（0x00）</li>
+<li>备份数据文件（0x01）</li>
+<li>带备份的值文件（0x02）</li>
+<li>带备份的线性记录文件（0x03）</li>
+<li>带备份的循环记录文件（0x04）</li>
+</ul>
+<h5 id="通信设置代码-加密模式"><a href="#通信设置代码-加密模式" class="headerlink" title="通信设置代码-加密模式"></a>通信设置代码-加密模式</h5><p>通信设置定义了PCD和PICC间通信的安全级别。通信设置始终适用于文件级别。</p>
+<img src="/post/6d83a629/%E9%80%9A%E4%BF%A1%E8%AE%BE%E7%BD%AE%E4%BB%A3%E7%A0%81.png" class="">
+
+<h5 id="访问权限代码"><a href="#访问权限代码" class="headerlink" title="访问权限代码"></a>访问权限代码</h5><p>每个应用中的每个文件都存储了4种不同的访问权限（每个文件2字节）：</p>
+<ul>
+<li>读（Read）访问 (GetValue, Debit for Value files) </li>
+<li>写（Write）访问(GetValue, Debit, LimitedCredit for Value files)</li>
+<li>读&amp;写（Read&amp;Write）访问（GetValue, Debit, LimitedCredit, Credit for Value files)</li>
+<li>修改访问权限（ChangeAccessRights）</li>
+</ul>
+<p>每种访问权限编码占用4位（半字节）。每半字节都连接到相关应用的密钥文件中的一个密钥。</p>
+<p>半字节排列16中不同的编码。如果值设为0-13（最多14个密钥），即引用了应用内密钥文件中的特定密钥，前提是该密钥必须存在（不允许选择不存在的密钥）。</p>
+<p>如果编码为14（0xE）就意味着“Free（自由）”访问。因此在选择相应的应用后，无论事先是否通过认 证，都授予相关的访问权限。</p>
+<p>编码15（0xF）定义了“Free（自由）”访问的反义词，也就是“Deny（拒绝）”访问。因此，相应的访问权限始终被拒绝。（译者注：此编码也被称为“Never”。）</p>
+<p>2字节参数的最高4位是获取读访问权限所必须知道的密钥的参考号（对于值文件是GetValue和Debit命令），接下来的4位是获取写访问权限的密钥编号（对于值文件是GetValue、Debit和LimitedCredit命令）。低字节的高半字节是获取读&amp;写访问权限的密钥编号，在值文件中该权限允许完全访问（对于值文件是 GetValue、Debit、LimitedCredit和Credit命令；对于记录文件是ClearRecordFile命令）。为修改文件访问权限和连接到每个访问权限的密钥编号，需要使用最低半字节中的密钥参考号进行认证。</p>
+<img src="/post/6d83a629/%E8%AE%BF%E9%97%AE%E6%9D%83%E9%99%90.png" class="">
+
+<p>有读访问和读&amp;写访问权限时可以读。有写访问和读&amp;写访问权限时可以写。如果一个文件未经有效认证，但通过至少一项相关访问权限可自由访问（0xE），通信模式强制设为明文。如果“读”和“读&amp;写”访问（或“写”和“读&amp;写”访问）权限中的一个被设为0xE，另一个则不是0xE，在经有效认证的情况下通信采用MAC&#x2F;加密，在无有效认证的情况下通信采用明文，第二种情况下，通信设置被PICC忽略。</p>
+<h5 id="状态和错误代码"><a href="#状态和错误代码" class="headerlink" title="状态和错误代码"></a>状态和错误代码</h5><img src="/post/6d83a629/%E7%8A%B6%E6%80%81%E5%92%8C%E9%94%99%E8%AF%AF%E4%BB%A3%E7%A0%81.png" class="">
+
+
+
+<h4 id="安全相关命令"><a href="#安全相关命令" class="headerlink" title="安全相关命令"></a>安全相关命令</h4><h5 id="Authenticate（认证）"><a href="#Authenticate（认证）" class="headerlink" title="Authenticate（认证）"></a>Authenticate（认证）</h5><img src="/post/6d83a629/%E8%AE%A4%E8%AF%81.png" class="">
+
+<p>认证PICC主密钥：</p>
+<p>PICC主密钥：00 11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF</p>
+<p>Rdr: 90 0A 00 00 01 00 00<br>Tag: FE 28 37 5D 1D 17 08 AC [91 AF]</p>
+<p>dk(RndB) &#x3D; dk(FE 28 37 5D 1D 17 08 AC) &#x3D; 41 5A 51 58 4E 87 38 14</p>
+<p>RndB’ &#x3D; 5A 51 58 4E 87 38 14 41 </p>
+<p>RndA &#x3D; 01 02 03 04 05 06 07 08</p>
+<p>dk(RndA+RndB’) &#x3D; dk(01 02 03 04 05 06 07 08 5A 51 58 4E 87 38 14 41) &#x3D; D9 16 AA 29 EF 0A 8F 6A EC 19 E2 FA A3 FC 1E 75</p>
+<p>Rdr: 90 AF 00 00 10 D9 16 AA 29 EF 0A 8F 6A EC 19 E2 FA A3 FC 1E 75 00<br>Tag: B6 F3 1E E6 F9 98 C2 35 [91 00]</p>
+<p>dk(RndA’) &#x3D; dk(B6 F3 1E E6 F9 98 C2 35) &#x3D; 02 03 04 05 06 07 08 01 </p>
+<p>session key &#x3D; RndA高4字节+RndB高4字节+RndA低4字节+RndB低4字节 &#x3D; 01 02 03 04 41 5A 51 58 05 06 07 08 4E 87 38 14</p>
+<h5 id="ChangeKeySettings（修改密钥设置）"><a href="#ChangeKeySettings（修改密钥设置）" class="headerlink" title="ChangeKeySettings（修改密钥设置）"></a>ChangeKeySettings（修改密钥设置）</h5><p>该命令根据当前选中的AID修改主密钥设置。如果预先选择了AID 0x00，修改应用于PICC密钥设置。反之（AID≠0x00），则修改应用于当前选中应用的应用密钥设置。</p>
+<img src="/post/6d83a629/%E4%BF%AE%E6%94%B9%E5%AF%86%E9%92%A5%E8%AE%BE%E7%BD%AE.png" class="">
+
+<img src="/post/6d83a629/PICC%E4%B8%BB%E5%AF%86%E9%92%A5%E8%AE%BE%E7%BD%AE.png" class="">
+
+<img src="/post/6d83a629/PICC%E4%B8%BB%E5%AF%86%E9%92%A5%E8%AE%BE%E7%BD%AE2.png" class="">
+
+<img src="/post/6d83a629/%E5%BA%94%E7%94%A8%E4%B8%BB%E5%AF%86%E9%92%A5%E8%AE%BE%E7%BD%AE.png" class="">
+
+<img src="/post/6d83a629/%E5%BA%94%E7%94%A8%E4%B8%BB%E5%AF%86%E9%92%A5%E8%AE%BE%E7%BD%AE2.png" class="">
+
+
+
+<p>修改PICC主密钥设置：</p>
+<p>1111B &#x3D; 0x0F </p>
+<p>通过PICC主密钥认证，配置即可修改。 CreateApplication无需通过PICC主密钥认证， DeleteApplication要求通过PICC主密钥或应用主密钥认证。GetApplicationIDs和GetKeySettings命令无需通过PICC主密钥认证。PICC主密钥可修改。</p>
+<p>原数据：0F 09 A9 00 00 00 00 00 </p>
+<p>使用session key 解密：06 80 18 59 BB FB 56 36</p>
+<p>Rdr: 90 54 00 00 08 06 80 18 59 BB FB 56 36 00<br>Tag: [91 00] 未知状态代码</p>
+<h5 id="GetKeySettings（获取密钥设置）"><a href="#GetKeySettings（获取密钥设置）" class="headerlink" title="GetKeySettings（获取密钥设置）"></a>GetKeySettings（获取密钥设置）</h5><p>GetKeySettings命令允许获取PICC和应用主密钥的设置。另外，该命令还返回所选应用能存<br>储的最大密钥数量。</p>
+<img src="/post/6d83a629/%E8%8E%B7%E5%8F%96%E5%AF%86%E9%92%A5%E8%AE%BE%E7%BD%AE.png" class="">
+
+<p>该命令没有参数。根据主密钥设置，需要先通过主密钥认证。如果请求PICC主密钥设置（当前选择的AID&#x3D;0x00），密钥数量返回为0x01，因为只有一个PICC主密钥。</p>
+<p>获取PICC主密钥设置：</p>
+<p>Rdr: 90 45 00 00 00<br>Tag: 0F 01 [91 00]</p>
+<h5 id="ChangeKey（修改密钥）"><a href="#ChangeKey（修改密钥）" class="headerlink" title="ChangeKey（修改密钥）"></a>ChangeKey（修改密钥）</h5><p>该命令允许修改PICC上存储的任何密钥。如果选中的AID为0x00，修改的是PICC主密钥，因此只有密钥编号0x00才是有效的（PICC上只有1个PICC主密钥）。其它情况（AID≠0x00），修改的是当前选中应用（由其AID代表）内指定编号的密钥。</p>
+<img src="/post/6d83a629/%E4%BF%AE%E6%94%B9%E5%AF%86%E9%92%A5.png" class="">
+
+<p>该命令第一个参数是1字节的密钥编号，取值范围是0x00到（应用的密钥数量-1）。第二个参数是经过加密处理的新密钥信息（此处的“加密”指密码学运算，并非狭义的“加密”操作）。相关的密钥设置定义了是否允许修改密钥，以及在执行ChangeKey命令前需要通过哪个密钥进行认证。</p>
+<ul>
+<li>修改任何密钥【除主密钥和ChangeKey键（Key）外】，都需要通过ChangeKey（指定的密钥）认证。</li>
+<li>修改ChangeKey键（Key）或主密钥，需要通过主密钥认证。</li>
+<li>当用于认证的密钥编号与欲修改的密钥编号不同，且ChangeKey键（Key）被设为0xE以外的值，PCD需要通过如下方式生成“DES解密后的密钥数据”：</li>
+</ul>
+<p>新密钥与当前密钥进行按位异或（XOR，16字节）。为异或后的数据计算CRC（2字节），并附在其后。 随后再附加新密钥的CRC（2字节）。在此之后，填充4字节0x00让数据长度达到8的倍数（总计24字 节）。最后对整个密钥数据字段进行DES&#x2F;3DES解密操作（使用当前过程密钥）。三个密文块使用CBC发送模式连接。</p>
+<ul>
+<li>当用于认证的密钥编号与欲修改的密钥编号相同，或ChangeKey键（Key）被设为0xE，PCD需要通过如 下方式生成“DES解密后的密钥数据”：</li>
+</ul>
+<p>计算新密钥的CRC（2字节）并附在其后。随后填充6字节0x00让数据长度达到8的倍数（总计24字节）。 最后对整个密钥数据字段进行DES&#x2F;3DES解密操作（使用当前过程密钥）。三个密文块使用CBC发送模式连接。</p>
+<ul>
+<li>当ChangeKey键（Key）被设为0xF（“Never”），除主密钥外的全部密钥均被冻结，因此若尝试修改主密钥之外的密钥，ChangeKey命令将返回错误代码。</li>
+</ul>
+<p>注：在成功修改用于达到当前认证状态的密钥后，认证会失效。后续操作需要使用新密钥认证。</p>
+<p>修改PICC主密钥：</p>
+<p>1、新密钥FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF，计算CRC16（ISO-IEC-14443-3-A）值为0xCB37，desfire卡片CRC16值低字节在前，值为0x37CB。</p>
+<p>2、需要发送给PICC的原始数据为：FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF 37 CB 00 00 00 00 00 00。</p>
+<p>3、使用当前session key进行DES&#x2F;3DES解密操作，解密后的数据为：4C 21 7A 58 3A D8 12 03 DC 29 DA A8 29 6A 43 0E 82 C9 D0 35 E5 9A 21 11。</p>
+<p>4、发送解密后的数据：00 4C 21 7A 58 3A D8 12 03 DC 29 DA A8 29 6A 43 0E 82 C9 D0 35 E5 9A 21 11。</p>
+<p>Rdr: 90 C4 00 00 19 00 4C 21 7A 58 3A D8 12 03 DC 29 DA A8 29 6A 43 0E 82 C9 D0 35 E5 9A 21 11 00<br>Tag: [91 00]</p>
+<h5 id="GetKeyVersion（获取密钥版本）"><a href="#GetKeyVersion（获取密钥版本）" class="headerlink" title="GetKeyVersion（获取密钥版本）"></a>GetKeyVersion（获取密钥版本）</h5><p>GetKeyVersion命令允许读出当前密钥的版本。如果选中的AID&#x3D;0x00，该命令返回PICC主密钥版本，因此只有密钥编号&#x3D;0x00才是有效的（PICC上只存在一个PICC主密钥）。在其他情况下（AID≠0x00），返回当前选中应用（由其AID表示）中的特定密钥编号的版本。</p>
+<img src="/post/6d83a629/%E8%8E%B7%E5%8F%96%E5%AF%86%E9%92%A5%E7%89%88%E6%9C%AC.png" class="">
+
+<p>该命令唯一的参数是密钥编号（1字节）。该命令以无符号字节返回指定密钥的版本。要修改密钥版本，使用ChangeKey命令，执行该命令无需认证。</p>
+<p>Rdr: 90 64 00 00 01 00 00<br>Tag: FF [91 00]</p>
+<h4 id="PICC级别命令"><a href="#PICC级别命令" class="headerlink" title="PICC级别命令"></a>PICC级别命令</h4><h5 id="CreateApplication（建立应用）"><a href="#CreateApplication（建立应用）" class="headerlink" title="CreateApplication（建立应用）"></a>CreateApplication（建立应用）</h5><p>CreateApplication命令允许在PICC上建立新应用。</p>
+<img src="/post/6d83a629/%E5%BB%BA%E7%AB%8B%E5%BA%94%E7%94%A8.png" class="">
+
+<p>应用通过应用标识符（AID）识别。AID是一个24位（3字节）长度的数字。 应用标识符0x00 00 00为PICC 自身保留。</p>
+<p>根据PICC主密钥设置，可能需要先通过PICC主密钥认证。</p>
+<p>该命令要求当前选中的AID是0x00 00 00（代表卡片级别）。</p>
+<p>每张PICC最多可容纳28个应用。每应用都连接到最多由“14个不同的可被用户定义的访问密钥”的集合。要在应用中存储数据，必须在应用中建立“文件”，每应用中最多可创建16个大小和类型各异的文件。每个文件都有不同级别的访问权限，这些权限可以连接到应用的密钥。</p>
+<p>24位AID是该命令的第一个参数。第二个参数是应用主密钥设置。最后一个参数“密钥数量“，定义了该应用中可以存储多少个密钥。所有密钥都以16个0x00初始化，因此它们都是单DES密钥。</p>
+<p>注：强烈建议在发卡时使用命令ChangeKey对密钥进行个性化设置。</p>
+<p>建立应用：</p>
+<p>1、应用AID为0x112233，应用主密钥设置为0x09（修改任何密钥都需要使用应用主密钥进行认证、如通过应用主密钥认证，允许修改应用主密钥设置、只有通过应用主密钥认证才能建立&#x2F;删除文件、执行GetFileIDs、GetFileSettings和GetKeySettings命令需要先通过应用主密钥认证、应用主密钥可以修改），密钥数量为0x0E。</p>
+<p>2、向PICC发送数据：11 22 33 09 0E。</p>
+<p>Rdr: 90 CA 00 00 05 11 22 33 09 0E 00<br>Tag: [91 00]</p>
+<h5 id="DeleteApplication（删除应用）"><a href="#DeleteApplication（删除应用）" class="headerlink" title="DeleteApplication（删除应用）"></a>DeleteApplication（删除应用）</h5><p>DeleteApplication命令允许永久禁用（Deactivate）PICC上的应用。</p>
+<img src="/post/6d83a629/%E5%88%A0%E9%99%A4%E5%BA%94%E7%94%A8.png" class="">
+
+<p>将要删除的应用程序由它的应用程序标识符 AID 表示，这是该命令的唯一参数。</p>
+<p>根据PICC主密钥设置，需要先通过PICC主密钥或应用主密钥认证。</p>
+<p>使用应用程序主密钥进行认证的，必须使用要删除的应用的主密钥。</p>
+<p>AID分配已被删除，因此可以新建一个与被删除应用AID相同的新应用。然而，被删除的内存块（memory  block）仅能通过FormatPICC命令擦除整个PICC的用户内存来恢复。</p>
+<p>注：尽管PICC主密钥是全零的默认值，并且“建立&#x2F;删除无需PICC主密钥”已被设置，但删除应用仍需要通 过PICC主密钥或相关应用主密钥认证。</p>
+<p>注：如果当前选中的应用已被删除，该命令自动选择PICC级别，也就是AID&#x3D;0x00 00 00。</p>
+<p>删除AID&#x3D;11 22 33的应用：</p>
+<p>Rdr: 90 DA 00 00 03 11 22 33 00<br>Tag: [91 00]</p>
+<h5 id="GetApplicationIDs（获取应用标识符，AID）"><a href="#GetApplicationIDs（获取应用标识符，AID）" class="headerlink" title="GetApplicationIDs（获取应用标识符，AID）"></a>GetApplicationIDs（获取应用标识符，AID）</h5><p>GetApplicationIDs命令返回PICC上所有活跃（active）应用的应用标识符（AID）。</p>
+<img src="/post/6d83a629/%E8%8E%B7%E5%8F%96%E5%BA%94%E7%94%A8%E6%A0%87%E8%AF%86%E7%AC%A6.png" class="">
+
+<p>该命令不接受任何参数。根据PICC主密钥设置，执行该命令可能需要通过PICC主密钥认证。该命令要求当前选中的AID是0x00 00 00，也就代表是卡片级。</p>
+<p>PICC发送一个包含全部已安装AID的序列作为应答。如果该序列不能放在一个帧中，PICC会设置额外的帧， 并将全部有后续的帧的状态字设为0xAF。</p>
+<p>获取应用标识符：</p>
+<p>Rdr: 90 6A 00 00 00<br>Tag: 11 22 33 [91 00]</p>
+<h5 id="SelectApplication（选择应用）"><a href="#SelectApplication（选择应用）" class="headerlink" title="SelectApplication（选择应用）"></a>SelectApplication（选择应用）</h5><p>SelectApplication命令允许为进一步操作选择一个特定的应用。</p>
+<img src="/post/6d83a629/%E9%80%89%E6%8B%A9%E5%BA%94%E7%94%A8.png" class="">
+
+<p>该命令的参数是3字节的AID。如果参数为0x00 00 00，选中的是PICC级别，任何进一步的操作都与此级别有关（典型命令是 CreateApplication、DeleteApplication等）。如果指定的AID在PICC中的应用目录内被找到，则后续命令与该应用交互。正如Authentication命令的描述，每个SelectApplication命令都会使当前的认证状态失效。</p>
+<p>选择应用：</p>
+<p>Rdr: 90 5A 00 00 03 11 22 33 00<br>Tag: [91 00]</p>
+<h5 id="FormatPICC（格式化PICC）"><a href="#FormatPICC（格式化PICC）" class="headerlink" title="FormatPICC（格式化PICC）"></a>FormatPICC（格式化PICC）</h5><p>该命令释放PICC的用户内存。</p>
+<img src="/post/6d83a629/%E6%A0%BC%E5%BC%8F%E5%8C%96PICC.png" class="">
+
+<p>该命令无参数。FormatPICC命令在PICC上释放全部已分配的用户内存。全部应用都会被删除，这些应用中的文件也都会被删除。PICC主密钥和PICC主密钥设置保持为当前值，它们不受此命令的影响。该命令始终要求先通过PICC主密钥认证。</p>
+<p>格式化PICC：</p>
+<p>Rdr: 90 FC 00 00 00<br>Tag: [91 00] </p>
+<h5 id="GetVersion（获取版本）"><a href="#GetVersion（获取版本）" class="headerlink" title="GetVersion（获取版本）"></a>GetVersion（获取版本）</h5><p>GetVersion返回PICC的制造商相关数据。</p>
+<img src="/post/6d83a629/%E8%8E%B7%E5%8F%96%E7%89%88%E6%9C%AC.png" class="">
+
+<p>该命令没有参数。</p>
+<p>PICC返回3个含有制造商相关数据的帧：</p>
+<p>第1帧：包含硬件相关信息：</p>
+<p>​	byte1：制造商ID（0x04代表PHILIPS）</p>
+<p>​	byte2：类型（此处为0x01）</p>
+<p>​	byte3：子类型（此处为0x01）</p>
+<p>​	byte4：主要版本</p>
+<p>​	byte5：次要版本</p>
+<p>​	byte6：存储空间*（此处为0x18 &#x3D; 4096字节）</p>
+<p>​	byte7：通信协议类型（此处为0x05，代表ISO 14443-2和-3)</p>
+<p>第2帧：包含软件相关信息：</p>
+<p>​	byte1：制造商ID（0x04代表PHILIPS）</p>
+<p>​	byte2：类型（此处为0x01）</p>
+<p>​	byte3：子类型（此处为0x01）</p>
+<p>​	byte4：主要版本</p>
+<p>​	byte5：次要版本</p>
+<p>​	byte6：存储空间*（此处为0x18 &#x3D; 4096字节）</p>
+<p>​	byte7：通信协议类型（此处为0x05，代表ISO 14443-3和-4)</p>
+<p>第3帧：返回唯一序列号、批次号、制造年分和星期：</p>
+<p>​	byte1 to byte7：唯一序列号</p>
+<p>​	byte8 to byte12：产品批号</p>
+<p>​	byte13：制造星期（一年中的第几个星期）</p>
+<p>​	byte14：制造年份</p>
+<p>* 该字节高7位的值为n，表示卡片容量基于2^n（字节）。如果卡片容量正好为2^n，LSBit（最低位）设为0；如果卡片容量介于2^n和2^(n+1)之间，则LSBit设为1。4K DESFire卡高7位为“0001100”（2^12&#x3D;4096），最低位为“0”。8K DESFire卡高7位为“0001101”（2^13&#x3D;8192），最低位为“0”。</p>
+<p>获取版本：</p>
+<p>Rdr: 90 60 00 00 00<br>Tag: 04 01 01 01 00 16 05 [91 AF]</p>
+<p>Rdr: 90 AF 00 00 00<br>Tag: 04 01 01 01 04 16 05 [91 AF]</p>
+<p>Rdr: 90 AF 00 00 00<br>Tag: 04 40 64 FA 03 5C 80 B9 0C 18 41 30 04 18 [91 00]</p>
+<h4 id="应用级别命令"><a href="#应用级别命令" class="headerlink" title="应用级别命令"></a>应用级别命令</h4><h5 id="GetFileIDs（获取文件ID，FID）"><a href="#GetFileIDs（获取文件ID，FID）" class="headerlink" title="GetFileIDs（获取文件ID，FID）"></a>GetFileIDs（获取文件ID，FID）</h5><p>GetFileIDs命令返回当前选中应用下的所有活动（Active）文件的文件标识符（FID）。</p>
+<img src="/post/6d83a629/%E8%8E%B7%E5%8F%96%E6%96%87%E4%BB%B6ID.png" class="">
+
+<p>该命令没有参数。根据应用主密钥设置，可能需要先通过应用主密钥认证。每个文件标识符占用1字节，取值范围是0x00-0x0F。每个文件都有一个明确的标识符，因此不会出现重复的值。一个应用内的文件数量被限制为16个，因此应答始终可以放在一个数据帧内。</p>
+<p>获取文件ID：</p>
+<p>Rdr: 90 6F 00 00 00<br>Tag: 00 01 02 [91 00]</p>
+<h5 id="GetFileSettings（获取文件设置）"><a href="#GetFileSettings（获取文件设置）" class="headerlink" title="GetFileSettings（获取文件设置）"></a>GetFileSettings（获取文件设置）</h5><p>GetFileSettings命令允许获取指定文件的属性信息。该命令提供的信息取决于被请求文件的类型。</p>
+<img src="/post/6d83a629/%E8%8E%B7%E5%8F%96%E6%96%87%E4%BB%B6%E8%AE%BE%E7%BD%AE.png" class="">
+
+<p> GetFileSettings命令有一个参数，就是当前选中应用内被请求文件的文件标识符。文件标识符的取值范围必须在0x00-0x0F之间。</p>
+<p>根据应用主密钥设置，可能需要先通过应用主密钥认证。</p>
+<p>在更新一个值文件的值后，却没有应用CommitTransaction命令，GetFileSettings命令将始终获取有限圈存值的旧的、未更改的限值。</p>
+<p>返回消息的第一部分对于所有的文件类型均相同：</p>
+<p>第一字节指示文件类型，下一字节提供了文件的通信设置信息（明文&#x2F;MAC&#x2F;加密），接下来的2字节信息是文件访问权限字段。</p>
+<p>响应中的所有后续字节都具有特殊含义，具体取决于文件类型：</p>
+<ul>
+<li>标准数据文件和备份数据文件：一个3字节字段表示用户文件空间字节。</li>
+<li>值文件：前三个字段，每字段都是4字节。第一个字段为文件的“下限”（在建立文件时定义）；第二个字段为文件的“上限”（在建立文件时定义）；第三个字段为当前最大的“有限圈存”值。如果有限圈存功能没有启用，第三个字段全为零。最后的字节自成一个字段，表示是否允许对该文件使用 LimitedCredit命令（00为禁用，01为启用）。</li>
+<li>线性记录文件和循环记录文件：三个字段，每字段长3字节。第一个字段表示一条记录的空间（在建立文件时定义）；第二字段表示记录文件的最大记录条目数量（在建立文件时定义）；第三字段表示记录文件中当前拥有的记录数量，该数量等于记录文件中当前能读取的最大记录数量。</li>
+</ul>
+<p>Rdr: 90 F5 00 00 01 05 00<br>Tag: 03 00 EE EE 10 00 00 03 00 00 00 00 00 [91 00]</p>
+<h5 id="ChangeFileSettings（修改文件设置）"><a href="#ChangeFileSettings（修改文件设置）" class="headerlink" title="ChangeFileSettings（修改文件设置）"></a>ChangeFileSettings（修改文件设置）</h5><p>该命令修改现有文件的访问参数。</p>
+<img src="/post/6d83a629/%E4%BF%AE%E6%94%B9%E6%96%87%E4%BB%B6%E8%AE%BE%E7%BD%AE.png" class="">
+
+<p>第一个1字节的参数，是当前应用中的文件标识符。下一个字节定义了新的通信设置。最后的2字节字段定义了新的访问权限。修改仅能在当前访问权限中的“修改访问权限”不为“Never”（0xF）时成功。为保证ChangeFileSettings命令来自前先前发起认证的同一方，有必要应用与ChangeKey命令大致相同的安全机制。</p>
+<p>为3字节新设置计算CRC，并附在其后。经过修改的数据流现长度为5字节，在其后附加3字节0x00达到8字节长度，以满足DES&#x2F;3DES操作的需求。最后在PCD端对数据完成DES&#x2F;3DES解密。PICC可通过执行DES&#x2F;3DES加密操作并检查明文的CRC，以核实收到数据的真实性。然而，如果“修改访问权限”的被设置为“Free”（0xE），则不需要安全机制，因此数据以明文形式发送（总共5字节长度）。</p>
+<p>Rdr: 90 5F 00 00 04 05 01 00 00 00<br>Tag: [91 00]</p>
+<h5 id="CreateStdDataFile（建立标准数据文件）"><a href="#CreateStdDataFile（建立标准数据文件）" class="headerlink" title="CreateStdDataFile（建立标准数据文件）"></a>CreateStdDataFile（建立标准数据文件）</h5><p>CreateStdDataFile命令用于在PICC上现有的应用内建立存储明文非格式化用户数据的文件。</p>
+<img src="/post/6d83a629/%E5%BB%BA%E7%AB%8B%E6%A0%87%E5%87%86%E6%95%B0%E6%8D%AE%E6%96%87%E4%BB%B6.png" class="">
+
+<p>该命令需要的第一个参数是新文件标识符，取值范围是0x00到0x0F。文件将在当前选中的应用内建立。不必按特殊的顺序在应用内建立文件。如果当前选中应用中已经存在指定的文件标识符，则会返回错误代码。接下来的一个字节定义了通信设置，随后一个2字节的字段定义了新文件的访问权限，最后一个3字节参数指定了文件的空间（字节）。</p>
+<p>注：MF3 IC D40内部以32字节的倍数分配NV内存。因此建立文件命令的文件空间参数为0x00 00 01（1字 节空间）时，内部消耗的空间是0x00 00 20，也就是32字节。</p>
+<p>建立标准数据文件：</p>
+<p>文件标识符为0x00，明文通信0x00，文件访问权限0xEEEE，文件空间0x000020。</p>
+<p>Rdr: 90 CD 00 00 07 00 00 EE EE 20 00 00 00<br>Tag: [91 00]</p>
+<p>文件标识符0x01，明文MAC通信0x01，文件访问权限0x0000（验证应用主密钥），文件空间0x000020。</p>
+<p>Rdr: 90 CD 00 00 07 01 01 00 00 20 00 00 00<br>Tag: [91 00]</p>
+<p>文件标识符0x02，加密通信0x03，文件访问权限0x0000（验证应用主密钥），文件空间0x000020。</p>
+<p>Rdr: 90 CD 00 00 07 02 03 00 00 20 00 00 00<br>Tag: [91 00]</p>
+<h5 id="CreateBackupDataFile（建立备份数据文件）"><a href="#CreateBackupDataFile（建立备份数据文件）" class="headerlink" title="CreateBackupDataFile（建立备份数据文件）"></a>CreateBackupDataFile（建立备份数据文件）</h5><p>CreateBackupDataFile命令用于在PICC上的现有应用中建立存储明文非格式化用户数据的文件，该文件还支持集成的备份机制。</p>
+<img src="/post/6d83a629/%E5%BB%BA%E7%AB%8B%E5%A4%87%E4%BB%BD%E6%95%B0%E6%8D%AE%E6%96%87%E4%BB%B6.png" class="">
+
+<p>正如“备份数据文件”名称所暗示的那样，该类型的文件提供集成的备份机制。每个写命令都在该文件的独立镜像中完成。要验证对此类型文件的写访问，需要使用CommitTransaction命令进行确认，如果PCD未发送CommitTransaction命令，只有镜像被修改，原数据保持不变且有效。除文件标识符参数外，其余参数的格式均与CreateStdDataFile命令一致，只有应用中的前8个文件才支持集成的备份机制，因此文件标识符仅允许为0x00到0x07。因为镜像的缘故，备份数据文件对PICC上NV内存的开销，始终是同尺寸标准数据文件的二倍。</p>
+<p>建立备份数据文件：</p>
+<p>文件标识符为0x03，明文通信0x00，文件访问权限0xEEEE，文件空间0x000040。</p>
+<p>Rdr: 90 CB 00 00 07 03 00 EE EE 40 00 00 00<br>Tag: [91 00]</p>
+<h5 id="CreateValueFile（建立值文件）"><a href="#CreateValueFile（建立值文件）" class="headerlink" title="CreateValueFile（建立值文件）"></a>CreateValueFile（建立值文件）</h5><p>CreateValueFile命令用于在PICC上现有的应用中建立存储和操作32位有符号整数值的文件。</p>
+<img src="/post/6d83a629/%E5%BB%BA%E7%AB%8B%E5%80%BC%E6%96%87%E4%BB%B6.png" class="">
+
+<p>第一个参数长1字节，为在当前选中应用内建立的新文件的文件标识符，范围是0x00到0x07。接下来的一个字节定义了通信设置。后面的2字节字段定义了新文件的访问权限。下一个参数长度为4字节，是该文件的有效下限，下限标记出当前值的消费（Debit）计算不能越过的边界，该参数是4字节有符号整数，因此也可以为负值。后面还是4字节，对圈存（Credit）操作以相同的方式设置上限，该参数同为4字节有符号整数。上限必须大于等于下限，否则PICC会发送错误消息，并且不会建立文件。下一个参数也是4字节有符号整数，指定了值文件的初始值，上限和下限由PICC检查，如果不一致则不创建文件，并由PICC发送错误消息。最后一个字节用于激活有限圈存（LimitedCredit）功能，0x00表示禁用，0x01表示启用。值文件始终提供集成的备份机制。因此每次修改值的访问都需要使用CommitTransaction命令验证。</p>
+<p>建立值文件：</p>
+<p>文件标识符为0x04，明文MAC通信0x01，文件访问权限0x0000（验证应用主密钥），下限为0x00000000，上限为0x00002710（10000），初始值为0x000003E8（1000），激活有限圈存0x01。</p>
+<p>Rdr: 90 CC 00 00 11 04 01 00 00 00 00 00 00 10 27 00 00 E8 03 00 00 01 00<br>Tag: [91 00]</p>
+<h5 id="CreateLinearRecordFile（建立线性记录文件）"><a href="#CreateLinearRecordFile（建立线性记录文件）" class="headerlink" title="CreateLinearRecordFile（建立线性记录文件）"></a>CreateLinearRecordFile（建立线性记录文件）</h5><p>CreateLinearRecordFile命令用于在PICC上现有应用内建立适合结构数据多重存储（如顾客忠诚度计划）的文件。一旦文件完全被数据记录充满，除非进行清空，否则无法向该文件继续写入。</p>
+<img src="/post/6d83a629/%E5%BB%BA%E7%AB%8B%E7%BA%BF%E6%80%A7%E8%AE%B0%E5%BD%95%E6%96%87%E4%BB%B6.png" class="">
+
+<p>第一个参数长度为1字节，是在选中应用内欲新建文件的文件标识符，取值范围0x00-0x07。下一个字节定义了通信设置。接下来的2字节字段定义了新文件的访问权限。下一个3字节长度的参数，是一条记录的尺寸（字节），该参数的取值范围为0x00 00 01到0xFF FF FF。最后一个参数也是3字节长度，是记录的条目数，该参数的取值范围也是0x00 00 01到0xFF FF FF。因此整个文件在PICC NV内存中的尺寸为：记录尺寸*最大记录数量。线性记录文件总是提供集成的备份机制，因此每次添加记录访问都需要使用CommitTransaction命令进行验证。</p>
+<p>建立线性记录文件：</p>
+<p>文件标识符为0x05，明文MAC通信0x01，文件访问权限0x0000，记录长度0x00 00 10，最大记录数量0x00 00 03。</p>
+<p>Rdr: 90 C1 00 00 0A 05 01 00 00 10 00 00 03 00 00 00<br>Tag: [91 00] </p>
+<h5 id="CreateCyclicRecordFile（建立循环记录文件）"><a href="#CreateCyclicRecordFile（建立循环记录文件）" class="headerlink" title="CreateCyclicRecordFile（建立循环记录文件）"></a>CreateCyclicRecordFile（建立循环记录文件）</h5><p>CreateCyclicRecordFile命令用于在PICC上现有的应用内建立适用于结构树多重存储（例如交易记录）的文件。一旦文件完全被数据记录充满，PICC自动以最后一条写入的记录覆盖最早的一条。该操作对PCD完全透明。</p>
+<img src="/post/6d83a629/%E5%BB%BA%E7%AB%8B%E5%BE%AA%E7%8E%AF%E8%AE%B0%E5%BD%95%E6%96%87%E4%BB%B6.png" class="">
+
+<p>首个参数的长度为1字节，取值范围是0x00到0x07，是在当前选中应用内欲新建文件的文件标识符。下一个字节定义了通信设置。接下来的2字节字段定义了新文件的访问权限。下一个3字节长度的参数，是一条记录的尺寸（字节），该参数的取值范围为0x00 00 01到0xFF FF FF。最后一个参数也是3字节长度，是记录的条目数，该参数的取值范围也是0x00 00 01到0xFF FF FF。因此整个文件在PICC NV内存中的尺寸为：记录尺寸*最大记录数量。循环记录文件总是提供集成的备份机制。因此每次添加记录访问都需要使用CommitTransaction命令进行验证。</p>
+<p>注意：因为备份功能会占用一条记录，“最大记录数量”需要比应用所需的数量多1。</p>
+<p>建立循环记录文件：</p>
+<p>文件标识符为0x06，明文通信0x00，文件访问权限0xEEEE，记录长度0x00 00 10，最大记录数量0x00 00 03。</p>
+<p>Rdr: 90 C0 00 00 0A 06 00 EE EE 10 00 00 03 00 00 00<br>Tag: [91 00]</p>
+<h5 id="DeleteFile（删除文件）"><a href="#DeleteFile（删除文件）" class="headerlink" title="DeleteFile（删除文件）"></a>DeleteFile（删除文件）</h5><p>DeleteFile命令永久停用（deactivate）当前选中应用的文件目录内的一个文件。</p>
+<img src="/post/6d83a629/%E5%88%A0%E9%99%A4%E6%96%87%E4%BB%B6.png" class="">
+
+<p>该命令使用1个字节作为参数， 表示文件标识符，取值范围0x00到0x0F。该命令的操作使指定文件的“文件目录条目”失效，这就意味着该文件无法再访问。根据应用主密钥的设置，需要先通过应用主密钥认证。被删除文件占用的内存块并没有被释放，被删除文件的文件标识符可以被重新用于在应用内建立新文件。为释放内存块，整个PICC的用户NV内存都需要使用FormatPICC命令擦除。</p>
+<p>测试删除文件：</p>
+<p>1、建立一个标准数据文件，文件标识符0x08，明文通信0x00，文件访问权限0xEEEE，文件空间0x000020。</p>
+<p>Rdr: 90 CD 00 00 07 08 00 EE EE 20 00 00 00<br>Tag: [91 00]</p>
+<p>2、删除文件标识符0x08的标准数据文件。</p>
+<p>Rdr: 90 DF 00 00 01 08 00<br>Tag: [91 00]</p>
+<h4 id="数据操作命令"><a href="#数据操作命令" class="headerlink" title="数据操作命令"></a>数据操作命令</h4><h5 id="ReadData（读数据）"><a href="#ReadData（读数据）" class="headerlink" title="ReadData（读数据）"></a>ReadData（读数据）</h5><p>ReadData命令允许从标准数据文件或备份数据文件中读数据。</p>
+<img src="/post/6d83a629/%E8%AF%BB%E6%95%B0%E6%8D%AE.png" class="">
+
+<p>第一个参数长度为1字节，定义欲读取文件的文件标识符。该参数的取值范围，对于标准数据文件为0x00到 0x0F，对于备份数据文件为0x00到0x07。</p>
+<p>下一个参数长度为3字节，是读操作在文件中的起始位置（偏移量），该参数的取值范围是从0x00 00 00到 文件尺寸-1。</p>
+<p>第三个参数的长度也是3字节，指定了要读取数据的字节数，该参数的范围从0x00 00 00到0xFF FF FF。</p>
+<p>如果第三个参数设置为0x00 00 00，从偏移量开始的整个数据文件都会被读取。</p>
+<p>如果字节数太多，无法用一帧发给PCD，PICC在发送下一帧给PCD之前，会等待状态字节为0xAF的状态帧。</p>
+<p>如果备份数据文件在写入后并未执行CommitTransaction命令而进行读取，ReadData命令总会得到存储在PICC中过时且未经修改的数据。只有在执行CommitTransaction命令后，备份数据文件才 会被验证并且对ReadData命令“外部可见”。</p>
+<p>读命令要求先通过“读”或“读&amp;写”访问指定的密钥认证。</p>
+<p>根据连接到文件的通信设置，PICC可以使用明文、MAC或加密方式发送数据，所有密码学操作均以CBC模式完成。</p>
+<p>对于MAC和加密通信，需要对数据填充以达到8字节的倍数。在特定数据长度（命令参数“长度”≠0x00 00  00）的情况下，填充全部为0x00。</p>
+<p>仅在加密通信并读取整个文件（命令参数“长度”&#x3D;0x00 00 00）的情况下，填充的第一字节才为0x80，其余填充字节仍为0x00（根据ISO 9797-1）。</p>
+<p>注：在MAC通信的情况下，填充字节仅作密码学用途，并不会在PCD和PICC间交换。</p>
+<p>读数据，明文通信，文件标识符0x00的标准数据文件，读取16字节数据：</p>
+<p>Rdr: 90 BD 00 00 07 00 00 00 00 10 00 00 00<br>Tag: 00 11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF [91 00]</p>
+<h5 id="WriteData-（写数据）"><a href="#WriteData-（写数据）" class="headerlink" title="WriteData （写数据）"></a>WriteData （写数据）</h5><p>WriteData命令允许向标准数据文件和备份数据文件写入数据。</p>
+<img src="/post/6d83a629/%E5%86%99%E6%95%B0%E6%8D%AE.png" class="">
+
+<p>第一个参数长度为1字节，定义了要写入文件的文件标识符，取值范围对于标准数据文件是0x00到0x0F，对于备份数据文件是0x00到0x07。</p>
+<p>下一个参数长度为3字节，是写操作在文件中的起始位置（偏移量）。该参数的取值范围是从0x00 00 00到 文件尺寸-1。</p>
+<p>第三个参数的长度也是3字节，指定要写入数据的字节数。该参数的取值范围是从0x00 00 01到0xFF FF FF。</p>
+<p>如果要发送的字节数过多，无法放在一帧中，PCD在发送下一帧给PICC前，会等待状态字为0xAF的状态帧。</p>
+<p>写命令要求先通过“写”或“读&amp;写”访问指定的密钥认证。</p>
+<p>根据连接到文件的通信设置，PCD需要通过明文、MAC或加密方式发送数据。全部密码学操作均以CBC模式完成。</p>
+<p>对于MAC和加密通信，需要对数据填充以达到8字节的倍数。填充全部为0x00。</p>
+<p>如果WriteData对备份数据文件操作，需要使用CommitTransaction命令对写入的数据进行验证，AbortTransaction命令将使所有的修改失效。</p>
+<p>如果数据写入到标准数据文件（没有集成备份机制），数据直接被编程到文件的可视NV内存。新数据对于后续的任何ReadData命令都是即刻生效的。</p>
+<p>注：在MAC或加密通信的情况下，PICC通过数据帧末尾的MAC或CRC（包含必要的填充字节）对数据的有效性进行验证。若验证失败（MAC&#x2F;CRC与数据不符、填充字节无效），PICC中止NV编程并返回完整性错误给PCD。由于完整性错误，任何事务，包括可能已经开始的事务，都将自动中止。</p>
+<p>注：在写入标准数据文件时遇到完整性错误可能导致文件内容损坏。</p>
+<p>注：在MAC通信的情况下，填充字节仅作密码学用途，并不会在PCD和PICC间交换。</p>
+<p>写数据：</p>
+<p>1、明文通信，文件标识符0x00的标准数据文件，写入16字节数据00 11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF。</p>
+<p>Rdr: 90 3D 00 00 17 00 00 00 00 10 00 00 00 11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF 00<br>Tag: [91 00]</p>
+<p>2、明文MAC通信，文件标识符0x01的标准数据文件，写入16字节数据00 11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF。</p>
+<p>session key：01 02 03 04 17 6B F1 03</p>
+<p>命令数据域（不含填充字节0x00）：00 11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF。</p>
+<p>对命令数据域计算MAC：0D52B2F7。</p>
+<p>Rdr: 90 3D 00 00 1B 01 00 00 00 10 00 00 00 11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF 0D 52 B2 F7 00<br>Tag: [91 00] </p>
+<p>3、加密通信，文件标识符0x02的标准数据文件，写入16字节数据00 11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF。</p>
+<p>session key：01 02 03 04 F2 FC 03 78</p>
+<p>命令数据域（不含CRC-A和填充字节0x00）：00 11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF。</p>
+<p>计算CRC-A：CC 69。</p>
+<p>对数据域使用CBC发送模式执行解密：1DFD5C53B874F660693E12C8BA7BC47C5AF06764C2B7B22A。</p>
+<p>Rdr: 90 3D 00 00 1F 02 00 00 00 10 00 00 1D FD 5C 53 B8 74 F6 60 69 3E 12 C8 BA 7B C4 7C 5A F0 67 64 C2 B7 B2 2A 00<br>Tag: [91 00]</p>
+<h5 id="GetValue-（获取值）"><a href="#GetValue-（获取值）" class="headerlink" title="GetValue （获取值）"></a>GetValue （获取值）</h5><p>GetValue命令允许从值文件读取当前存储的值。</p>
+<img src="/post/6d83a629/%E8%8E%B7%E5%8F%96%E5%80%BC.png" class="">
+
+<p>该命令唯一的参数长度1字节，为文件标识符。该参数的取值范围从0x00到0x07。</p>
+<p>PICC处理值文件的当前值。根据通信模式，数据以明文（4字节）、加密（8字节加密数据：4字节值、2字节 CRC、2字节填充0x00）或MAC（4字节值+4字节MAC）发送。</p>
+<p>值始终以LSB在前表示。</p>
+<p>GetValue命令要求先通过“读”、“写”或“读&amp;写”访问指定的密钥认证。</p>
+<p>在更新值文件后没有执行CommitTransaction命令，GetValue命令总会获得过时且未经修改的值，该值仍然有效。</p>
+<p>Rdr: 90 6C 00 00 01 04 00<br>Tag: E8 03 00 00 45 EF AD BA [91 00]</p>
+<h5 id="Credit-（圈存）"><a href="#Credit-（圈存）" class="headerlink" title="Credit （圈存）"></a>Credit （圈存）</h5><p>Credit命令允许增加存储在值文件中的值。</p>
+<img src="/post/6d83a629/%E5%9C%88%E5%AD%98.png" class="">
+
+<p>该命令的第一个参数长度为1字节，是文件标识符。该参数的取值范围为0x00到0x07。</p>
+<p>该命令在数据字段中传输特定的值（4字节有符号整数），并增加到存储在文件中的当前值上。Credit命令值接受正数。</p>
+<p>根据通信模式不同，值可以明文（4字节）、加密（8字节加密数据：4字节值、2字节CRC、2字节填充 0x00）或MAC（4字节值+4字节MAC）方式传输。</p>
+<p>值始终以LSB在前表示。</p>
+<p>需要以CommitTransaction命令验证更新后的值，AbortTransaction命令将使所有修改失效。</p>
+<p>Credit、Debit和LimitedCredit命令对值的修改将被累积，直到执行CommitTransaction命令。</p>
+<p>Credit命令绝不会修改值文件的有限圈存值。然而，如果有限圈存值需要被设为0，可以使用LimitedCredit命令并将值设定为0。</p>
+<p>Credit命令要求先通过“读&amp;写”访问指定的密钥认证。</p>
+<p>圈存，文件标识符为0x04的值文件，增加0x32(50)：</p>
+<p>命令数据域：32 00 00 00。</p>
+<p>计算MAC：782A6A33。</p>
+<p>Rdr: 90 0C 00 00 09 04 32 00 00 00 78 2A 6A 33 00<br>Tag: [91 00]</p>
+<p>提交事务：</p>
+<p>Rdr: 90 C7 00 00 00<br>Tag: [91 00]</p>
+<h5 id="Debit（消费）"><a href="#Debit（消费）" class="headerlink" title="Debit（消费）"></a>Debit（消费）</h5><p>Debit命令允许减少存储在值文件中的值。</p>
+<img src="/post/6d83a629/%E6%B6%88%E8%B4%B9.png" class="">
+
+<p>第一个参数的长度为1字节，是文件标识符。该参数的取值范围是0x00到0x07。</p>
+<p>下一个参数（4字节有符号整数）是要从“文件中存储的当前值”中减去的值。Debit命令只接受正数值。</p>
+<p>根据通信模式不同，值可以明文（4字节）、加密（8字节加密数据：4字节值值、2字节CRC、2字节填充 0x00）或MAC（4字节值+4字节MAC）方式传输。</p>
+<p>值始终以LSB在前表示。</p>
+<p>需要以CommitTransaction命令验证更新后的值，AbortTransaction命令将使所有修改失效。</p>
+<p>Credit、Debit和LimitedCredit命令对值的修改将被累积，直到执行CommitTransaction命令。</p>
+<p>Debit命令要求先通过“读”、“写”或“读&amp;写”访问指定的密钥认证。</p>
+<p>如果LimitedCredit功能被启用，在CommitTransaction命令执行前的一个事务内的Debit命令的总和，将设为后续LimitedCredit命令的新限制。这确保LimitedCredit命令重设（re-book）的值不会超过之前消费 （Debit）交易扣除的值。</p>
+<p>消费，文件标识符为0x04的值文件，减少0x10(16)：</p>
+<p>Rdr: 90 DC 00 00 09 04 10 00 00 00 EC DF 95 F7 00<br>Tag: [91 00]</p>
+<p>提交事务：</p>
+<p>Rdr: 90 C7 00 00 00<br>Tag: [91 00]</p>
+<h5 id="LimitedCredit（有限圈存）"><a href="#LimitedCredit（有限圈存）" class="headerlink" title="LimitedCredit（有限圈存）"></a>LimitedCredit（有限圈存）</h5><p>LimitedCredit命令允许有限地增加存储在值文件中的值，而无需拥有文件的完整“读&amp;写”权限。该功能可在值文件建立时启用或禁用。</p>
+<img src="/post/6d83a629/%E6%9C%89%E9%99%90%E5%9C%88%E5%AD%98.png" class="">
+
+<p>该命令发送的第一个参数长度为1字节，是文件标识符。该参数的取值范围为0x00到0x07。</p>
+<p>该命令将文件中存储的当前值增加一定数量（4字节有符号整数），该数量在数据字段中传输。LimitedCredit命令只接受正值。</p>
+<p>根据通信模式不同，值可以明文（4字节）、加密（8字节加密数据：4字节值值、2字节CRC、2字节填充 0x00）或MAC（4字节值+4字节MAC）方式传输。</p>
+<p>值始终以LSB在前表示。</p>
+<p>需要以CommitTransaction命令验证更新后的值，AbortTransaction命令将使所有修改失效。</p>
+<p>Credit、Debit和LimitedCredit命令对值的修改将被累积，直到执行CommitTransaction命令。</p>
+<p>LimitedCredit命令要求先通过“写”或“读&amp;写”访问指定的密钥认证。</p>
+<p>在包含消费（Debit）的最近一次交易中，Debit命令的总和将成为LimitedCredit命令的限值。在执行 LimitedCredit命令后，无论重设（re-book）的值如何，新限制都设为0。因此，LimitedCredit命令仅能在消费（Debit）交易后使用一次。</p>
+<p>有限圈存，文件标识符为0x04的值文件，增加0x10(16)：</p>
+<p>Rdr: 90 1C 00 00 09 04 10 00 00 00 EC DF 95 F7 00<br>Tag: [91 00]</p>
+<p>Rdr: 90 1C 00 00 09 04 10 00 00 00 EC DF 95 F7 00<br>Tag: [91 BE]尝试读&#x2F;写数据越过了文件&#x2F;记录的边界。 尝试超出了值文件的限制。</p>
+<p>提交事务：</p>
+<p>Rdr: 90 C7 00 00 00<br>Tag: [91 00]</p>
+<h5 id="WriteRecord-（写记录）"><a href="#WriteRecord-（写记录）" class="headerlink" title="WriteRecord （写记录）"></a>WriteRecord （写记录）</h5><p>WriteRecord命令允许将数据写入到循环或线性记录文件的记录中。</p>
+<img src="/post/6d83a629/%E5%86%99%E8%AE%B0%E5%BD%95.png" class="">
+
+<p>第一个参数只有1字节长度，是文件标识符。该参数的取值范围是0x00到0x07。</p>
+<p>接下来的3字节是在一条记录中的偏移量（字节）。该参数的取值范围是0x00 00 00到记录尺寸-1。</p>
+<p>后面的3字节是要写入记录文件的数据长度。该参数的取值范围从0x00 00 01到（记录尺寸-偏移量）。</p>
+<p>对于线性记录文件，WriteRecord命令在最后附加一条记录；对于已经写满的循环记录文件，则是擦除并覆盖最早的一条记录。整个新记录在写入数据前将被清空（cleared）。</p>
+<p>如果在WriteRecord命令后没有执行CommitTransaction命令，对同一个文件的 WriteRecord命令将写入已经创建的记录。在发送CommitTransaction命令后，新的WriteRecord命令将在记录文件中创建新记录。AbortTransaction命令将使所有的修改失效。</p>
+<p>执行ClearRecordFile命令后，但尚未执行CommitTransaction或AbortTransaction命令，则无法对同一个记录文件执行WriteRecord命令。</p>
+<p>根据连接到文件的通信设置，PCD发送的数据可能为明文、MAC或加密。全部密码学操作均以CBC模式完成。</p>
+<p>对于MAC和加密通信，需要对数据填充以达到8字节的倍数。填充使用0x00。</p>
+<p>WriteRecord命令要求先通过“写”或“读&amp;写”访问指定的密钥认证。</p>
+<p>注：在MAC通信的情况下，填充字节仅作密码学用途，并不会在PCD和PICC间交换。</p>
+<p>文件标识符为0x05，明文MAC通信0x01，文件访问权限0x0000，记录长度0x00 00 10，最大记录数量0x00 00 03，线性记录文件写入数据0102030405060708A1A2A3A4A5A6A7A8。</p>
+<p>session key：010203049ECB76AD。</p>
+<p>计算MAC：16DA1F87。</p>
+<p>Rdr: 90 3B 00 00 1B 05 00 00 00 10 00 00 01 02 03 04 05 06 07 08 A1 A2 A3 A4 A5 A6 A7 A8 16 DA 1F 87 00<br>Tag: [91 00]</p>
+<p>执行CommitTransaction：</p>
+<p>Rdr: 90 C7 00 00 00<br>Tag: [91 00]</p>
+<p>写入数据112233445566778800AABBCCDDEEFF10：</p>
+<p>计算MAC：43CBB8B3。</p>
+<p>Rdr: 90 3B 00 00 1B 05 00 00 00 10 00 00 11 22 33 44 55 66 77 88 00 AA BB CC DD EE FF 10 43 CB B8 B3 00<br>Tag: [91 00]</p>
+<p>执行CommitTransaction：</p>
+<p>Rdr: 90 C7 00 00 00<br>Tag: [91 00]</p>
+<p>写入数据FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF：</p>
+<p>计算MAC：F8AFA98F。</p>
+<p>Rdr: 90 3B 00 00 1B 05 00 00 00 10 00 00 FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF F8 AF A9 8F 00<br>Tag: [91 00]</p>
+<p>执行CommitTransaction：</p>
+<p>Rdr: 90 C7 00 00 00<br>Tag: [91 00]</p>
+<h5 id="ReadRecords（读记录）"><a href="#ReadRecords（读记录）" class="headerlink" title="ReadRecords（读记录）"></a>ReadRecords（读记录）</h5><p>ReadRecords命令允许从循环或线性记录文件中读出完整记录的集合。</p>
+<img src="/post/6d83a629/%E8%AF%BB%E8%AE%B0%E5%BD%95.png" class="">
+
+<p>第一个参数的长度为1字节，是文件标识符，取值范围0x00到0x07。</p>
+<p>下一个参数长度3字节，是读取最新（newest）记录的偏移量。该参数为0x00 00 00时，读出第一个 （latest）记录。偏移量的值必须为0x00 00 00到现存记录数量-1。</p>
+<p>第三个参数也是3字节长度，是要从PICC读取的记录数量。PICC始终以时间顺序传送记录（以最早的记录开始，也就是给定偏移记录之前的记录编号-1）。若该参数设置为0x00 00 00，从最老的记录直到最新的记录 （偏移量参数给定）都将被读出。</p>
+<p>记录数量参数的允许取值范围是0x00 00 00到（现有记录数量 - 偏移量）。</p>
+<p>注：对于循环记录文件，存储有效记录的最大数量，比CreateCyclicRecordFile命令指定的记录数量少1。</p>
+<p>对空记录文件（刚建立或刚被清空）执行ReadRecords命令会导致错误。</p>
+<p>ReadRecords命令要求先通过“读”或“读&amp;写”访问指定的密钥认证。</p>
+<p>根据连接到文件的通信设置，PICC可以明文、MAC或加密发送数据。全部密码学操作均以CBC 模式完成。</p>
+<p>对于MAC和加密通信，需要对数据填充以达到8字节的倍数。对于特定的记录数（命令参数“长度”≠0x00  00 00）填充均以0x00完成。</p>
+<p>只有在加密通信并且读取全部文件时（命令参数“长度”&#x3D;0x00 00 00），填充的第一个字节才是0x80，其 余填充字节仍为0x00（根据ISO 9797-1）。</p>
+<p>注：在MAC通信的情况下，填充字节仅作密码学用途，并不会在PCD和PICC间交换。</p>
+<p>读取文件标识符为0x05的线性记录文件全部记录：</p>
+<p>Rdr: 90 BB 00 00 07 05 00 00 00 00 00 00 00<br>Tag: 01 02 03 04 05 06 07 08 A1 A2 A3 A4 A5 A6 A7 A8 11 22 33 44 55 66 77 88 00 AA BB CC DD EE FF 10 FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF EB E2 BD 85 [91 00]</p>
+<p>读取第一条记录：</p>
+<p>Rdr: 90 BB 00 00 07 05 00 00 00 01 00 00 00<br>Tag: FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF 03 A9 31 69 [91 00]</p>
+<p>读取第二条记录：</p>
+<p>Rdr: 90 BB 00 00 07 05 01 00 00 01 00 00 00<br>Tag: 11 22 33 44 55 66 77 88 00 AA BB CC DD EE FF 10 C0 EF 62 3B [91 00]</p>
+<p>读取第三条记录：</p>
+<p>Rdr: 90 BB 00 00 07 05 02 00 00 01 00 00 00<br>Tag: 01 02 03 04 05 06 07 08 A1 A2 A3 A4 A5 A6 A7 A8 93 1C 84 63 [91 00]</p>
+<h5 id="ClearRecordFile（清空值文件）"><a href="#ClearRecordFile（清空值文件）" class="headerlink" title="ClearRecordFile（清空值文件）"></a>ClearRecordFile（清空值文件）</h5><p>ClearRecordFile命令允许把循环或线性记录文件重置为空。</p>
+<img src="/post/6d83a629/%E6%B8%85%E7%A9%BA%E5%80%BC%E6%96%87%E4%BB%B6.png" class="">
+
+<p>该命令发送的唯一参数是1字节的文件标识符。取值范围0x00到0x07。</p>
+<p>执行ClearRecordFile命令后，但尚未执行CommitTransaction命令，全部后续WriteRecord命令均无法执行。ReadRecords命令将返回过时的有效记录。</p>
+<p>执行CommitTransaction命令后，执行ReadRecords命令会失败，执行WriteRecord命令则成功。</p>
+<p>AbortTransaction命令（替代CommitTransaction命令）将使清空失效。</p>
+<p>执行该命令需要拥有文件上完整的“读&amp;写”权限。</p>
+<p>清空文件标识符为0x05的线性记录文件：</p>
+<p>Rdr: 90 EB 00 00 01 05 00<br>Tag: [91 00]</p>
+<p>执行CommitTransaction：</p>
+<p>Rdr: 90 C7 00 00 00<br>Tag: [91 00]</p>
+<h5 id="CommitTransaction（提交事务）"><a href="#CommitTransaction（提交事务）" class="headerlink" title="CommitTransaction（提交事务）"></a>CommitTransaction（提交事务）</h5><p>CommitTransaction命令允在一个应用中，验证先前对备份数据文件、值文件和记录文件的写入访问。</p>
+<img src="/post/6d83a629/%E6%8F%90%E4%BA%A4%E4%BA%8B%E5%8A%A1.png" class="">
+
+<p>该命令没有参数。</p>
+<p>CommitTransaction命令验证到这些文件的全部写入访问（带集成备份机制的文件）：</p>
+<ul>
+<li>备份数据文件</li>
+<li>值文件</li>
+<li>线性记录文件</li>
+<li>循环记录文件</li>
+</ul>
+<p>CommitTransaction通常是在ISO 14443-4 Deselect命令前或处理另一个应用（SelectApplication）前，事务的最后一个命令。</p>
+<p>作为CommitTransaction命令的逻辑对应，AbortTransaction命令将使“带集成备份管理的文件”上的修改失效。</p>
+<p>Rdr: 90 C7 00 00 00<br>Tag: [91 00]</p>
+<h5 id="AbortTransaction（中止事务）"><a href="#AbortTransaction（中止事务）" class="headerlink" title="AbortTransaction（中止事务）"></a>AbortTransaction（中止事务）</h5><p>AbortTransaction命令允许在一个应用中，使先前在备份数据文件、值文件或记录文件上的写入访问失效。  该命令用于取消事务，而不必对PICC重新认证，就可实现（重新认证）相同的效果。</p>
+<img src="/post/6d83a629/%E4%B8%AD%E6%AD%A2%E4%BA%8B%E5%8A%A1.png" class="">
+
+<p>该命令没有参数。</p>
+<p>AbortTransaction命令在不更改认证状态的前提下，使所有对“带集成备份机制文件”的写访问失效：</p>
+<ul>
+<li>备份数据文件</li>
+<li>值文件</li>
+<li>线性记录文件</li>
+<li>循环记录文件</li>
+</ul>
+<p>Rdr: 90 A7 00 00 00<br>Tag: [91 0C]备份文件未作修改，不需要CommitTransaction &#x2F;  AbortTransaction命令。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/CPU%E5%8D%A1/" rel="tag"># CPU卡</a>
+              <a href="/tags/%E9%9D%9E%E6%8E%A5%E8%A7%A6%E5%BC%8FIC%E5%8D%A1/" rel="tag"># 非接触式IC卡</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/post/7929743.html" rel="prev" title="CPU卡片FM1208(FMCOS)调试">
+                  <i class="fa fa-chevron-left"></i> CPU卡片FM1208(FMCOS)调试
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/post/90829052.html" rel="next" title="计算机组成原理知识点总结">
+                  计算机组成原理知识点总结 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="beian"><a href="https://beian.miit.gov.cn/" rel="noopener" target="_blank">蜀ICP备2022020904号-1 </a>
+      <img src="/images/beian.png" alt=""><a href="http://www.beian.gov.cn/portal/registerSystemInfo?recordcode=51010802001288" rel="noopener" target="_blank">川公网安备51010802001288号 </a>
+  </div>
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">袁维</span>
+</div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.4.0/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+
+
+
+
+
+</body>
+</html>

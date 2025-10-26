@@ -9,6 +9,7 @@
 #include "cppdes/des3cbc.h"
 #include <algorithm>
 #include <random>
+#include "../../Headers/Utils/KeyUtils.h"
 
 namespace
 {
@@ -240,6 +241,16 @@ bool MifareDesfireCard::authenticate(uint8_t keyNo, const std::array<uint8_t, De
 
     std::cout << "Encrypted RndB bytes: ";
     for (auto byte : encRndB)
+    {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << std::endl;
+
+    // Store encrypted RndB for later use as IV in CBC operations (pad to 16 bytes)
+    std::fill(sessionEncRndB_.begin(), sessionEncRndB_.end(), 0);
+    std::copy(encRndB.begin(), encRndB.end(), sessionEncRndB_.begin());
+    std::cout << "Stored encrypted RndB (sessionEncRndB_): ";
+    for (auto byte : sessionEncRndB_)
     {
         std::cout << Hex0x(byte) << " ";
     }
@@ -570,32 +581,29 @@ bool MifareDesfireCard::authenticate(uint8_t keyNo, const std::array<uint8_t, De
         std::cout << "Stored RndA: ";
         for (auto byte : sessionRndA_)
         {
-            std::cout << Hex0x(byte) << " ";
+            std::cout << Hex0x(byte) << ", ";
         }
         std::cout << std::endl;
 
         std::cout << "Stored RndB: ";
         for (auto byte : sessionRndB_)
         {
-            std::cout << Hex0x(byte) << " ";
+            std::cout << Hex0x(byte) << ", ";
         }
         std::cout << std::endl;
 
-    // Calculate and store session key
-    // Ensure we start from an empty vector, reserve 16 bytes capacity
-    sessionKey_.clear();
-    sessionKey_.reserve(16);
-    // sessionKey = rnda[0..3] || rndb[0..3] || rnda[4..7] || rndb[4..7]
-    sessionKey_.insert(sessionKey_.end(), sessionRndA_.begin(), sessionRndA_.begin() + 4);
-    sessionKey_.insert(sessionKey_.end(), sessionRndB_.begin(), sessionRndB_.begin() + 4);
-    // Only insert bytes 4..7 (4 bytes) rather than to .end() which would add padded zeros
-    sessionKey_.insert(sessionKey_.end(), sessionRndA_.begin() + 4, sessionRndA_.begin() + 8);
-    sessionKey_.insert(sessionKey_.end(), sessionRndB_.begin() + 4, sessionRndB_.begin() + 8);
+        sessionKey_.resize(16);
+        sessionKey_Versioned.resize(16);
 
-        std::cout << "Derived session key: ";
+        std::fill(sessionKey_.begin(), sessionKey_.end(), 0);
+        std::fill(sessionKey_Versioned.begin(), sessionKey_Versioned.end(), 0);
+
+        DeriveSessionKey(sessionRndA_.data(), sessionRndB_.data(), currentKey_.data(), sessionKey_.data(), sessionKey_Versioned.data());
+
+        std::cout << "Session key: ";
         for (auto byte : sessionKey_)
         {
-            std::cout << Hex0x(byte) << " ";
+            std::cout << Hex0x(byte) << ", ";
         }
         std::cout << std::dec << std::endl;
 
@@ -644,14 +652,235 @@ bool MifareDesfireCard::changeKey(uint8_t keyNo, const std::array<uint8_t, Desfi
     }
 
     std::cout << "✓ Session valid (current: " << keyAlgoToString(currentKeyType_) << ")\n";
-
-    // === STEP 2: Build ChangeKey command payload ===
-    std::cout << "--- Step 2: Build ChangeKey command payload ---\n";
     std::array<uint8_t, 8> iv = {0}; // Initial IV = 0s
 
-    
-    
+    // === STEP 2: CALCULATE CRC32 OF NEW KEY ===
+    std::cout << "--- Step 2: Calculate CRC32 of new key ---\n";
+    // Calculate crc over [ 0xC4, KeyNo, NewKey ] 
+    std::vector<uint8_t> crcCryptoBuf{0xC4, keyNo};
+    crcCryptoBuf.insert(crcCryptoBuf.end(), newKey.begin(), newKey.end());
+    uint32_t crc = 0xFFFFFFFF;
+    crc = CalcCrc32(crcCryptoBuf.data(), crcCryptoBuf.size(), crc);
+    crc ^= 0xFFFFFFFF;
+    std::cout << "Calculated CRC32: 0x" << std::hex << std::setw(8) << std::setfill('0') << crc << std::dec << "\n";
 
+    // uint32_t crckey = 0xFFFFFFFF;
+    // crckey = CalcCrc32(newKey.data(), newKey.size(), crckey);
+    // crckey ^= 0xFFFFFFFF;
+    uint16_t crckey = calculateCRC16(newKey.data(), newKey.size());
+    std::cout << "Calculated Key CRC32: 0x" << std::hex << std::setw(8) << std::setfill('0') << crckey << std::dec << "\n";
+    
+    // === STEP 3: Create raw Crypto Payload ===
+    std::cout << "--- Step 3: Create cryptogram (not encrypted) ---\n";
+    // Append New Key, CRC Crypto, CRC NewKey
+    std::vector<uint8_t> cryptogram = {};
+    for (int i = 0; i < 16; i++)
+        cryptogram.push_back(newKey[i]);
+    // for (int i = 0; i < 4; i++)
+    //     cryptogram.push_back((crc >> (8 * i)) & 0xFF);
+    for (int i = 0; i < 2; i++)
+        cryptogram.push_back((crckey >> (8 * i)) & 0xFF);
+    for (int i = 0; i < 6; i++)
+        cryptogram.push_back(0x00); // padding
+
+    std::cout << "Raw cryptogram (before encryption): ";
+    for (auto byte : cryptogram)
+    {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << std::dec << std::endl;
+
+    // === STEP 4: ENCRYPT CRYPTOGRAM ===
+    std::cout << "--- Step 4: Encrypt cryptogram ---\n";
+
+    // Encrypt cryptogram with session key using the same call as in main.cpp
+    // cryptogram contains 24 bytes: NewKey(16) || CRC32(4) || padding(4)
+    if (sessionKey_.size() < 16)
+    {
+        Log("ERROR: session key too small for ChangeKey encryption\n");
+        std::cout << "❌ Error: session key not available for encryption\n";
+        return false;
+    }
+
+    // Encrypt cryptogram (24 bytes) using external cppdes DES3CBC in CBC mode
+    // Build 3DES keys (2-key 3DES: K3 = K1)
+    uint64_t key1_u64 = 0, key2_u64 = 0, key3_u64 = 0;
+    // sessionKey_ holds the derived session key (at least 16 bytes expected)
+    for (int i = 0; i < 8; i++)
+        key1_u64 = (key1_u64 << 8) | static_cast<uint8_t>(sessionKey_[i]);
+    if (sessionKey_.size() >= 16)
+    {
+        for (int i = 0; i < 8; i++)
+            key2_u64 = (key2_u64 << 8) | static_cast<uint8_t>(sessionKey_[8 + i]);
+    }
+    else
+    {
+        key2_u64 = key1_u64;
+    }
+    key3_u64 = key1_u64; // For 2-key 3DES
+
+    // Use DES3 primitive with per-block decrypt chaining to match legacy CryptDataCBC(CBC_SEND, KEY_DECIPHER)
+    DES3 des3(key1_u64, key2_u64, key3_u64);
+
+    uint8_t u8_Cryptogram_enc_ex[40] = {0};
+
+    // --- Variant A: seed chaining with sessionEncRndB_ (as implemented) ---
+    ui64 last_block_A = 0;
+    for (int i = 0; i < 8; i++)
+    {
+        last_block_A = (last_block_A << 8) | static_cast<uint8_t>(sessionEncRndB_[i]);
+    }
+
+    std::cout << "Using IV (sessionEncRndB_ first 8 bytes) for Variant A: ";
+    for (int i = 0; i < 8; i++)
+    {
+        std::cout << Hex0x(sessionEncRndB_[i]) << " ";
+    }
+    std::cout << std::endl;
+
+    uint8_t variantA[24] = {0};
+    for (size_t blockIdx = 0; blockIdx < 3; blockIdx++)
+    {
+        ui64 plain_u64 = 0;
+        for (size_t i = 0; i < 8; i++)
+            plain_u64 = (plain_u64 << 8) | static_cast<uint8_t>(cryptogram[blockIdx * 8 + i]);
+
+        std::cout << "VariantA Plain block[" << blockIdx << "]: ";
+        for (size_t i = 0; i < 8; i++) std::cout << Hex0x(cryptogram[blockIdx * 8 + i]) << " ";
+        std::cout << std::endl;
+
+        ui64 xored = plain_u64 ^ last_block_A;
+        std::cout << "VariantA XOR (plain ^ last_block): 0x" << std::hex << xored << std::dec << std::endl;
+
+        ui64 out_u64 = des3.decrypt(xored);
+
+        ui64 tmp = out_u64;
+        for (int i = 7; i >= 0; i--)
+        {
+            variantA[blockIdx * 8 + i] = static_cast<uint8_t>(tmp & 0xFF);
+            tmp >>= 8;
+        }
+
+        std::cout << "VariantA Cipher block[" << blockIdx << "]: ";
+        for (size_t i = 0; i < 8; i++) std::cout << Hex0x(variantA[blockIdx * 8 + i]) << " ";
+        std::cout << std::endl;
+
+        last_block_A = out_u64;
+    }
+
+    // --- Variant B: seed chaining with ZERO IV ---
+    ui64 last_block_B = 0x0000000000000000ULL;
+    std::cout << "Using IV (zero) for Variant B" << std::endl;
+
+    uint8_t variantB[24] = {0};
+    for (size_t blockIdx = 0; blockIdx < 3; blockIdx++)
+    {
+        ui64 plain_u64 = 0;
+        for (size_t i = 0; i < 8; i++)
+            plain_u64 = (plain_u64 << 8) | static_cast<uint8_t>(cryptogram[blockIdx * 8 + i]);
+
+        std::cout << "VariantB Plain block[" << blockIdx << "]: ";
+        for (size_t i = 0; i < 8; i++) std::cout << Hex0x(cryptogram[blockIdx * 8 + i]) << " ";
+        std::cout << std::endl;
+
+        ui64 xored = plain_u64 ^ last_block_B;
+        std::cout << "VariantB XOR (plain ^ last_block): 0x" << std::hex << xored << std::dec << std::endl;
+
+        ui64 out_u64 = des3.decrypt(xored);
+
+        ui64 tmp = out_u64;
+        for (int i = 7; i >= 0; i--)
+        {
+            variantB[blockIdx * 8 + i] = static_cast<uint8_t>(tmp & 0xFF);
+            tmp >>= 8;
+        }
+
+        std::cout << "VariantB Cipher block[" << blockIdx << "]: ";
+        for (size_t i = 0; i < 8; i++) std::cout << Hex0x(variantB[blockIdx * 8 + i]) << " ";
+        std::cout << std::endl;
+
+        last_block_B = out_u64;
+    }
+
+    // Print summaries
+    std::cout << "* CryptogrEnc VariantA (encRndB IV): ";
+    for (int i = 0; i < 24; i++) std::cout << Hex0x(variantA[i]) << " ";
+    std::cout << std::endl;
+
+    std::cout << "* CryptogrEnc VariantB (zero IV): ";
+    for (int i = 0; i < 24; i++) std::cout << Hex0x(variantB[i]) << " ";
+    std::cout << std::endl;
+
+    // Choose VariantB (zero IV) for sending — this is easier to test; if it doesn't match, we can switch.
+    std::memcpy(u8_Cryptogram_enc_ex, variantB, 24);
+
+    std::cout << "* CryptogrEnc: ";
+    for (size_t i = 0; i < 24; i++)
+    {
+        std::cout << Hex0x(u8_Cryptogram_enc_ex[i]) << " ";
+    }
+    std::cout << std::endl;
+
+    // Replace clear cryptogram bytes with the encrypted bytes for following steps
+    cryptogram.clear();
+    cryptogram.insert(cryptogram.end(), u8_Cryptogram_enc_ex, u8_Cryptogram_enc_ex + 24);
+
+    // === STEP 5: SEND ChangeKey COMMAND ===
+    std::cout << "--- Step 5: Send ChangeKey command ---\n";
+    // Build ChangeKey command
+
+    std::vector<uint8_t> cmd;
+    cmd.push_back(0x90);        // CLA
+    cmd.push_back(0xC4);        // INS = ChangeKey
+    cmd.push_back(0x00);        // P1
+    cmd.push_back(0x00);        // P2
+    // Per DESFire ChangeKey APDU format the data field is: <KeyNo> || <encrypted-cryptogram(24)>
+    // So Lc = 1 + cryptogram.size()
+    cmd.push_back(static_cast<uint8_t>(cryptogram.size() + 1)); // Lc
+    cmd.push_back(keyNo); // first data byte = KeyNo
+    cmd.insert(cmd.end(), cryptogram.begin(), cryptogram.end());
+    cmd.push_back(0x00); // Le
+
+    std::cout << "ChangeKey APDU: ";
+    for (size_t i = 0; i < cmd.size(); i++)
+    {
+        std::cout << Hex0x(cmd[i]) << " ";
+    }
+    std::cout << std::dec << std::endl;
+
+    using namespace NFC_Controller::Cpp;
+    auto command = InDataExchangeCommand(
+        InDataExchangeCommand::Options{
+            .payload = cmd,
+            .responseTimeoutMs = 2000
+    });
+
+    auto result = nfc_->executeCommand(command);
+    if (result.status != pn532Response::statusCode::OK)
+    {
+        Log("ERROR: ChangeKey failed with status: " + std::to_string(static_cast<int>(result.status)) + "\n");
+        std::cout << "❌ ChangeKey command failed\n";
+        return false;
+    }
+
+    std::cout << "ChangeKey response: ";
+    for (auto byte : result.responsePayload)
+    {
+        std::cout << Hex0x(byte) << " ";
+    }
+    std::cout << std::dec << std::endl;
+
+    // Check for success status 0x91 0x00
+    if (result.responsePayload.size() < 2 ||
+        result.responsePayload[result.responsePayload.size() - 2] != 0x91 ||
+        result.responsePayload[result.responsePayload.size() - 1] != 0x00)
+    {
+        Log("ERROR: ChangeKey command returned failure status\n");
+        std::cout << "❌ ChangeKey failed (card returned error)\n";
+        return false;
+    }
+
+    std::cout << "✅ ChangeKey successful!\n";
     return true;
 }
 

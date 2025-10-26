@@ -116,6 +116,7 @@ public:
         std::memset(&versionInfo_, 0, sizeof(versionInfo_));
         sessionRndA_.fill(0);
         sessionRndB_.fill(0);
+    sessionEncRndB_.fill(0);
         currentKey_.fill(0);
     }
 
@@ -157,7 +158,9 @@ protected:
     uint8_t currentKeyNo_;                        // Key number used in current session
     std::array<uint8_t, 16> sessionRndA_;         // RndA from last authentication (max 16 for AES)
     std::array<uint8_t, 16> sessionRndB_;         // RndB from last authentication (max 16 for AES)
-    std::vector<uint8_t>    sessionKey_;          // Session key derived from RndA and RndB (max 24 for 3-key 3DES)
+    std::array<uint8_t, 16> sessionEncRndB_;      // Encrypted RndB as received from card (used as IV for some CBC ops)
+    std::vector<uint8_t>    sessionKey_Versioned;          // Session key derived from RndA and RndB (max 24 for 3-key 3DES)
+    std::vector<uint8_t>    sessionKey_;
     std::array<uint8_t, 24> currentKey_;          // Current key used for auth (max 24 for 3-key 3DES)
     
     // Helper to parse version response frames
