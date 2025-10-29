@@ -10,3 +10,6 @@
 [submodule "addons/external/cppDes"]
 	path = addons/external/cppDes
 	url = https://github.com/fffaraz/cppDES
+[submodule "DesfireChangeMasterAppKey"]
+	path = DESFireChangeMasterAppKey
+	url = https://github.com/AndroidCrypto/DESFireChangeMasterAppKey

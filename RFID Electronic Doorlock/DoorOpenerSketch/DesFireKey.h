@@ -100,7 +100,21 @@ public:
         ClearIV();
         if (!CryptDataCBC(CBC_RECEIVE, KEY_ENCIPHER, u8_Data, u8_Data, ms32_BlockSize))
             return false;
+        // Session key: 48 EC 62 DE 3A 3C FE 62
+        // Encrypt:     00 00 00 00 00 00 00 00
+        // Encrypted:   E6 51 AC F2 B7 C2 98 FF
+        // 
+        // CMAC 1 : EF6 51 AC F2 B7 C2 98 F
+        // Bitshift CMAC1 left by one bit:
+        // CMAC1 : CC A3 59 E5 6F 85 31 FE
+        // CMAC1 : -> Because CC & 0x80 (MSB = 1) -> XOR CMAC 1 with R
+        // CMAC1 : CC A3 59 E5 6F 85 31 E5
 
+        // CMAC 2: CC A3 59 E5 6F 85 31 E5
+        // Bitshift CMAC2 left by one bit:
+        // CMAC 2: 99 46 B3 CA DF 0A 63 CA
+        // CMAC2: -> Because CC (cmac1) & 0x80 (MSB = 1) -> XOR CMAC 2 with R
+        // CMAC2: 99 46 B3 CA DF 0A 63 D1
         memcpy (mu8_Cmac1, u8_Data, ms32_BlockSize);
         Utils::BitShiftLeft(mu8_Cmac1, ms32_BlockSize);
         if (u8_Data[0] & 0x80)
@@ -117,6 +131,14 @@ public:
     // Calculate the CMAC (Cipher-based Message Authentication Code) from the given data.
     // The CMAC is the initialization vector (IV) after a CBC encryption of the given data.
     // ATTENTION: The content of i_Buffer will be modified!!
+    // 45 80 00 00 00 00 00 00
+    // Xor with CMAC 2
+    // 99 46 B3 CA DF 0A 63 D1
+    // --------------------------------
+    // DC C6 B3 CA DF 0A 63 D1
+    // Encrypt with session key
+    // Resulting Out is the CMAC: 
+    // D9 C6 E0 63 74 01 B7 52q
     bool CalculateCmac(TxBuffer& i_Buffer, byte u8_Cmac[16])
     {
         // If the data length is not a multiple of the block size -> pad the buffer with 80,00,00,00,....
