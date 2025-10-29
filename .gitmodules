@@ -13,3 +13,6 @@
 [submodule "DesfireChangeMasterAppKey"]
 	path = DESFireChangeMasterAppKey
 	url = https://github.com/AndroidCrypto/DESFireChangeMasterAppKey
+[submodule "addons/external/etl"]
+	path = addons/external/etl
+	url = https://github.com/ETLCPP/etl.git
