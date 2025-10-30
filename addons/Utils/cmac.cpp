@@ -10,7 +10,7 @@
 #include "cppdes/des3.h"
 #include "cppdes/des3cbc.h"
 
-#include "desfireKey.h"
+#include "../PN532_Controller/Source/desfireKey.h"
 
 template<typename T>
 void printHexArray(const T& arr, size_t length) {
@@ -124,4 +124,3 @@ int main(){
 
     return 0;
 }
-

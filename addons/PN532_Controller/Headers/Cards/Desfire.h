@@ -6,8 +6,12 @@
 #include <cstring>
 #include <iostream>
 #include <array>
+#include <variant>
 #include "KeyVersion.h"
 #include "KeyTraits.h"
+#include "../../Source/desfireKey.h"
+#include <span>
+#include <etl/vector.h>
 
 // Forward declaration
 namespace NFC_Controller {
@@ -116,8 +120,10 @@ public:
         std::memset(&versionInfo_, 0, sizeof(versionInfo_));
         sessionRndA_.fill(0);
         sessionRndB_.fill(0);
-    sessionEncRndB_.fill(0);
+        sessionEncRndB_.fill(0);
         currentKey_.fill(0);
+        currentKeyObj = std::monostate{};
+        sessionKeyObj = std::monostate{};
     }
 
     virtual std::string prettyType() const override {
@@ -130,10 +136,10 @@ public:
 
     // Template authenticate function - automatically deduces key size from KeyType
     template<DesfireKeyType KeyType>
-    bool authenticate(uint8_t keyNo, const std::array<uint8_t, DesfireKeyTraits<KeyType>::KeySize>& key);
-    
+    bool authenticate(uint8_t keyNo, const std::array<uint8_t, DesfireKeyTraits<KeyType>::keySize>& key);
 
-    
+    bool executeCommand(const etl::ivector<uint8_t>& command, etl::ivector<uint8_t>& response);
+
     virtual void authenticateAES(uint8_t keyNo, const std::array<uint8_t, 16>& RndB);
     
     // Get version information from the card via InDataExchange
@@ -142,7 +148,7 @@ public:
     virtual bool getKeyVersion(uint8_t keyNo, uint8_t& keyVersion);
 
     template<DesfireKeyType NewKeyType>
-    bool changeKey(uint8_t keyNo, const std::array<uint8_t, DesfireKeyTraits<NewKeyType>::KeySize>& newKey);
+    bool changeKey(uint8_t keyNo, const std::array<uint8_t, DesfireKeyTraits<NewKeyType>::keySize>& newKey);
 
     // Get the DESFire variant type (0 = unknown, 1 = EV1, 2 = EV2, 3 = EV3)
     virtual uint8_t getDesfireVariant();
@@ -163,9 +169,20 @@ protected:
     std::vector<uint8_t>    sessionKey_;
     std::array<uint8_t, 24> currentKey_;          // Current key used for auth (max 24 for 3-key 3DES)
     
+    std::variant<std::monostate,
+                DesfireKey<DesfireKeyType::DES>,
+                 DesfireKey<DesfireKeyType::DES3_2KEY>,
+                 DesfireKey<DesfireKeyType::DES3_3KEY>,
+                 DesfireKey<DesfireKeyType::AES>> currentKeyObj;
+
+    std::variant<std::monostate,
+                DesfireKey<DesfireKeyType::DES>,
+                 DesfireKey<DesfireKeyType::DES3_2KEY>,
+                 DesfireKey<DesfireKeyType::DES3_3KEY>,
+                 DesfireKey<DesfireKeyType::AES>> sessionKeyObj;
+    
     // Helper to parse version response frames
     bool parseVersionFrame(const uint8_t* data, uint8_t responseSize, uint8_t frameIndex);
 
     std::vector<uint8_t> getDesfireFullResponse(std::vector<uint8_t> initialApdu, int maxFrames = 10);
 };
-

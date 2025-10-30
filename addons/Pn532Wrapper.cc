@@ -253,7 +253,7 @@ Napi::Value PN532_Wrapper::GetVersion(const Napi::CallbackInfo &info)
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
         });
 
-        // Sleep(1000);
+        Sleep(1000);
 
         df->changeKey<desfire::DesfireKeyType::DES3_2KEY>(0x00, {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

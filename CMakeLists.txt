@@ -5,6 +5,9 @@ cmake_policy(SET CMP0042 NEW)
 project(deviceaddon VERSION 1.0.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 
+# # Add ETL as a static library
+add_subdirectory(${CMAKE_SOURCE_DIR}/addons/external/etl)
+
 # Add Tiny AES as a static library
 add_subdirectory(${CMAKE_SOURCE_DIR}/addons/external/tiny-aes)
 
@@ -72,6 +75,7 @@ target_link_libraries(${PROJECT_NAME}
         tiny-aes
         des
         libcppdes
+        etl::etl
 )
 
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD

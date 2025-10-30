@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <etl/vector.h>
 
 // Derive session key from RndA and RndB (matching the Python snippet):
 // session_key_calc = rnda[:4] + rndb[:4] + rnda[4:8] + rndb[4:8]
@@ -14,6 +15,11 @@ static bool IsSimpleDESKey(const uint8_t key[16])
         if (key[i] != key[8 + i])
             return false;
     return true;
+}
+
+template <typename T, typename... Ts>
+auto make_etl_vector(Ts... args) {
+    return etl::vector<T, sizeof...(Ts)>{args...};
 }
 
 // Derive session key from RndA/RndB and current key type.
