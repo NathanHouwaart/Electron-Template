@@ -78,6 +78,13 @@ target_link_libraries(${PROJECT_NAME}
         etl::etl
 )
 
+
+# Enable CTest at the top-level so tests added in subdirectories are
+# registered in the top-level CTestTestfile.cmake and discovered by ctest.
+enable_testing()
+
+add_subdirectory(${CMAKE_SOURCE_DIR}/addons/PN532_Controller/tests)
+
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
         $<TARGET_FILE:${PROJECT_NAME}>

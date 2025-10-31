@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <type_traits>
 #include <algorithm>
+#include <cstring>
 
 #include "cppdes/descbc.h"
 #include "cppdes/des3cbc.h"
@@ -105,7 +106,7 @@ public:
         }
         if constexpr (T == DesfireKeyType::DES)
         {
-            processDesBlock(in, out, encrypting);
+            processDesBlock(in, out, encrypting, xorPlain);
         }
         else if constexpr (T == DesfireKeyType::DES3_2KEY || T == DesfireKeyType::DES3_3KEY)
         {
@@ -221,7 +222,7 @@ private:
     {
         return (in[0] & 0x80u) != 0;
     }
-    void processDesBlock(std::span<const uint8_t> inBlock, std::span<uint8_t> outBlock, bool encrypting)
+    void processDesBlock(std::span<const uint8_t> inBlock, std::span<uint8_t> outBlock, bool encrypting, bool xorPlain = false)
     {
         // Implement DES block processing here
         std::cout << "Processing DES block (" << (encrypting ? "Encrypting" : "Decrypting") << ")\n";
@@ -233,17 +234,34 @@ private:
 
         DESCBC desCbc(key64, iv64); // Placeholder key and IV
 
+        uint64_t last_block = 0;
+
         // Convert every 8 bytes to ui64 and process
         for (size_t offset = 0; offset < inBlock.size(); offset += BS)
         {
             auto inChunk = std::span<const uint8_t>(inBlock.data() + offset, BS);
             uint64_t block = from_big_endian<uint64_t>(inChunk);
 
-            uint64_t processed = encrypting ? desCbc.encrypt(block) : desCbc.decrypt(block);
+            uint64_t toProcess = block;
+            if (xorPlain)
+            {
+                toProcess ^= last_block;
+            }
+
+                uint64_t processed = encrypting ? desCbc.encrypt(toProcess) : desCbc.decrypt(toProcess);
 
             auto outChunk = std::span<uint8_t>(outBlock.data() + offset, BS);
             to_big_endian<uint64_t>(processed, outChunk);
 
+            if (xorPlain)
+            {
+                // In xorPlain mode, iv is not updated per block
+                // So basically 3des without CBC chaining on output
+                // In xorPlain mode, update last_block with the processed output
+                    desCbc.reset();
+                last_block = processed;
+            }
+            
             std::memcpy(iv.data(), outChunk.data(), iv.size());
         }
     }
@@ -273,7 +291,7 @@ private:
         // When xorPlain==true we XOR the incoming (plaintext) block with the
         // last processed block (seed), then feed that to the DES3CBC primitive.
         // last_block seeds with zero as in the original snippet.
-        uint64_t last_block = 0ULL;
+        uint64_t last_block = 0;
 
         // Convert every 8 bytes to ui64 and process
         for (size_t offset = 0; offset < inBlock.size(); offset += BS)
@@ -294,9 +312,14 @@ private:
 
             if (xorPlain)
             {
+                // In xorPlain mode, iv is not updated per block
+                // So basically 3des without CBC chaining on output
+                // In xorPlain mode, update last_block with the processed output
                 des3cbc.reset();
                 last_block = processed;
             }
+            
+            std::memcpy(iv.data(), outChunk.data(), iv.size());
         }
 
         // debug output
